@@ -1,0 +1,137 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+:root {
+  --primary-orange: #f97316;
+  --primary-orange-hover: #ea580c;
+  --text-dark: #0f172a;
+  --text-muted: #64748b;
+  --bg-light: #ffffff;
+  --bg-muted: #f8fafc;
+  --bg-demo: #f1f5f9;
+  --border-color: #e2e8f0;
+  
+  --danger-red: #ef4444;
+  --danger-bg: #fef2f2;
+  
+  --success-orange: #f97316;
+  --success-bg: #fff7ed;
+
+  /* Spacing */
+  --max-width: 1200px;
+  --nav-height: 80px;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  color: var(--text-dark);
+  background-color: var(--bg-light);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  text-decoration: none;
+  color: inherit;
+}
+
+ul {
+  list-style: none;
+}
+
+.container {
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding: 0 1.5rem;
+}
+
+/* Common Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  border-radius: 0.5rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+  font-size: 1rem;
+}
+
+.btn-primary {
+  background-color: var(--primary-orange);
+  color: white;
+}
+
+.btn-primary:hover {
+  background-color: var(--primary-orange-hover);
+}
+
+.btn-secondary {
+  background-color: var(--bg-demo);
+  color: var(--text-dark);
+}
+
+.btn-secondary:hover {
+  background-color: #e2e8f0;
+}
+
+.btn-outline {
+  background-color: transparent;
+  border: 1px solid white;
+  color: white;
+}
+
+.btn-outline:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.btn-text {
+  background: none;
+  border: none;
+  color: var(--primary-orange);
+  font-weight: 600;
+  padding: 0;
+}
+
+.btn-text:hover {
+  opacity: 0.8;
+}
+
+/* Typography headers */
+h1 {
+  font-size: 3.5rem;
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+h2 {
+  font-size: 2.5rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+h3 {
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.text-orange {
+  color: var(--primary-orange);
+}
+
+.text-center {
+  text-align: center;
+}
+
+.section {
+  padding: 6rem 0;
+}

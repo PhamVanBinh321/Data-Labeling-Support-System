@@ -1,0 +1,78 @@
+.workflow-section {
+  padding: 8rem 0;
+}
+
+.workflow-steps {
+  display: flex;
+  justify-content: space-between;
+  position: relative;
+  max-width: 1000px;
+  margin: 0 auto;
+  gap: 2rem;
+}
+
+.workflow-step {
+  flex: 1;
+  text-align: center;
+  position: relative;
+}
+
+.step-number-container {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 2rem;
+  position: relative;
+}
+
+.step-number {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background-color: var(--primary-orange);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  font-weight: 700;
+  position: relative;
+  z-index: 2;
+  box-shadow: 0 0 0 8px rgba(249, 115, 22, 0.1);
+}
+
+.step-connector {
+  position: absolute;
+  top: 50%;
+  left: calc(50% + 32px);
+  width: calc(100% + 2rem - 64px);
+  height: 2px;
+  background-color: var(--border-color);
+  z-index: 1;
+}
+
+.workflow-step h3 {
+  font-size: 1.125rem;
+  margin-bottom: 0.75rem;
+  color: var(--text-dark);
+}
+
+.workflow-step p {
+  font-size: 0.95rem;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+/* Add responsive behavior */
+@media (max-width: 768px) {
+  .workflow-steps {
+    flex-direction: column;
+    gap: 4rem;
+  }
+  
+  .step-connector {
+    top: calc(100% + 8px);
+    left: 50%;
+    width: 2px;
+    height: calc(4rem - 16px);
+  }
+}
