@@ -1,0 +1,92 @@
+import React, { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Mail, Lock, Github } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+
+const LoginPage: React.FC = () => {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const { login } = useAuth();
+  const navigate = useNavigate();
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    // Handle login logic here
+    console.log('Login attempt with:', email);
+    login(); // Mock login 
+    
+    // Check if user already has a role tied to their account permanently
+    const savedRole = localStorage.getItem('annotate_pro_role');
+    if (savedRole) {
+      navigate(`/${savedRole}`);
+    } else {
+      navigate('/role-selection');
+    }
+  };
+
+  return (
+    <div className="auth-form">
+      <div className="auth-header">
+        <h1>Chào mừng trở lại</h1>
+        <p>Đăng nhập để tiếp tục quản lý dự án gán nhãn của bạn.</p>
+      </div>
+
+      <form onSubmit={handleSubmit}>
+        <div className="form-group">
+          <label htmlFor="email">Email</label>
+          <div className="input-with-icon" style={{ position: 'relative' }}>
+            <Mail size={18} color="#64748b" style={{ position: 'absolute', top: '12px', left: '12px' }} />
+            <input 
+              type="email" 
+              id="email" 
+              className="form-control" 
+              placeholder="name@company.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              style={{ paddingLeft: '2.5rem' }}
+              required 
+            />
+          </div>
+        </div>
+
+        <div className="form-group">
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <label htmlFor="password">Mật khẩu</label>
+            <a href="#" className="auth-link" style={{ fontSize: '0.875rem' }}>Quên mật khẩu?</a>
+          </div>
+          <div className="input-with-icon" style={{ position: 'relative' }}>
+            <Lock size={18} color="#64748b" style={{ position: 'absolute', top: '12px', left: '12px' }} />
+            <input 
+              type="password" 
+              id="password" 
+              className="form-control" 
+              placeholder="••••••••"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              style={{ paddingLeft: '2.5rem' }}
+              required 
+            />
+          </div>
+        </div>
+
+        <button type="submit" className="btn btn-primary auth-btn">
+          Đăng nhập
+        </button>
+      </form>
+
+      <div className="social-login">
+        <div className="separator"><span>Hoặc đăng nhập bằng</span></div>
+        <button className="social-btn" type="button">
+          <Github size={20} />
+          GitHub
+        </button>
+      </div>
+
+      <p className="auth-footer">
+        Chưa có tài khoản? <Link to="/register" className="auth-link">Đăng ký ngay</Link>
+      </p>
+    </div>
+  );
+};
+
+export default LoginPage;

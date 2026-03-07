@@ -17,7 +17,7 @@ const Hero: React.FC = () => {
             Tăng tốc huấn luyện AI bằng dữ liệu chính xác và quy trình chuyên nghiệp. Tối ưu hóa hiệu suất và độ chính xác cho mô hình Machine Learning của bạn.
           </p>
           <div className="hero-actions">
-            <button className="btn btn-primary">Bắt đầu ngay</button>
+            <button className="btn btn-primary">Tạo tài khoản</button>
             <button className="btn btn-secondary">
               <Play size={18} fill="currentColor" /> Xem Demo
             </button>

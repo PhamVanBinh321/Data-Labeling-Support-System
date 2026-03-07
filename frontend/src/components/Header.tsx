@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import './Header.css';
 
 const Header: React.FC = () => {
@@ -13,12 +14,11 @@ const Header: React.FC = () => {
         <nav className="nav-links">
           <a href="#features">Features</a>
           <a href="#solutions">Solutions</a>
-          <a href="#pricing">Pricing</a>
         </nav>
 
         <div className="header-actions">
-          <button className="btn btn-text">Login</button>
-          <button className="btn btn-primary">Dùng thử miễn phí</button>
+          <Link to="/login" className="btn btn-text">Đăng nhập</Link>
+          <Link to="/register" className="btn btn-primary">Đăng ký</Link>
         </div>
       </div>
     </header>

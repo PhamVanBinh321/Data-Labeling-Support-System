@@ -1,0 +1,76 @@
+.reviewer-queue-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.quality-score {
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.text-green {
+  color: #10b981;
+}
+
+.text-orange {
+  color: #f97316;
+}
+
+.text-red {
+  color: #ef4444;
+}
+
+.text-gray {
+  color: #94a3b8;
+}
+
+.text-purple {
+  color: #8b5cf6;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.btn-outline-green {
+  background-color: transparent;
+  color: #10b981;
+  border: 1px solid #10b981;
+  padding: 0.4rem;
+}
+
+.btn-outline-green:hover {
+  background-color: #10b981;
+  color: white;
+}
+
+.btn-outline-red {
+  background-color: transparent;
+  color: #ef4444;
+  border: 1px solid #ef4444;
+  padding: 0.4rem;
+}
+
+.btn-outline-red:hover {
+  background-color: #ef4444;
+  color: white;
+}
+
+.select-filter {
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  font-size: 0.95rem;
+  outline: none;
+  background-color: white;
+  min-width: 200px;
+  cursor: pointer;
+}
+
+.select-filter:focus {
+  border-color: var(--primary-orange);
+  box-shadow: 0 0 0 2px rgba(249, 115, 22, 0.1);
+}

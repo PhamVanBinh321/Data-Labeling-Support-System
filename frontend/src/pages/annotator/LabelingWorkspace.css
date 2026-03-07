@@ -1,0 +1,264 @@
+.workspace-layout {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100vw;
+  background-color: #0f172a;
+  color: white;
+  overflow: hidden;
+}
+
+/* Topbar */
+.workspace-topbar {
+  height: 56px;
+  background-color: #1e293b;
+  border-bottom: 1px solid #334155;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 1rem;
+  flex-shrink: 0;
+}
+
+.workspace-topbar .topbar-left, 
+.workspace-topbar .topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.task-meta h2 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0 0 0.1rem 0;
+}
+
+.task-meta span {
+  font-size: 0.75rem;
+  color: #94a3b8;
+}
+
+.workspace-topbar .btn-icon {
+  background: transparent;
+  color: #cbd5e1;
+  border: none;
+  cursor: pointer;
+  padding: 0.5rem;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  transition: background-color 0.2s;
+}
+
+.workspace-topbar .btn-icon:hover {
+  background-color: #334155;
+  color: white;
+}
+
+/* Main Area */
+.workspace-main {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* Left Toolbar */
+.workspace-toolbar {
+  width: 56px;
+  background-color: #1e293b;
+  border-right: 1px solid #334155;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 1rem 0;
+  flex-shrink: 0;
+}
+
+.tool-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.tool-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.tool-btn:hover {
+  background-color: #334155;
+  color: white;
+}
+
+.tool-btn.active {
+  background-color: rgba(249, 115, 22, 0.2);
+  color: var(--primary-orange);
+}
+
+/* Center Canvas */
+.workspace-canvas {
+  flex: 1;
+  background-color: #0f172a;
+  position: relative;
+  overflow: hidden;
+  /* background pattern for empty areas */
+  background-image: radial-gradient(#334155 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+/* Right Sidebar */
+.workspace-sidebar {
+  width: 300px;
+  background-color: #1e293b;
+  border-left: 1px solid #334155;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
+.sidebar-section {
+  padding: 1.25rem 1rem;
+  border-bottom: 1px solid #334155;
+}
+
+.instances-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding-bottom: 0;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.section-header h3 {
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #e2e8f0;
+  margin: 0;
+}
+
+.section-header .badge {
+  background-color: #334155;
+  color: #94a3b8;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  margin-left: auto;
+}
+
+/* Labels List */
+.labels-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.label-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 0.75rem;
+  background-color: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.label-item:hover {
+  background-color: #1e293b;
+  border-color: #475569;
+}
+
+.label-item.active {
+  border-color: var(--primary-orange);
+  background-color: rgba(249, 115, 22, 0.1);
+}
+
+.label-color {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  display: inline-block;
+}
+
+.label-name {
+  font-size: 0.85rem;
+  color: #cbd5e1;
+}
+
+.label-item.active .label-name {
+  color: white;
+  font-weight: 500;
+}
+
+/* Instances List */
+.instances-content {
+  flex: 1;
+  overflow-y: auto;
+  padding-bottom: 1rem;
+}
+
+.empty-instances {
+  color: #64748b;
+  font-size: 0.85rem;
+  text-align: center;
+  padding: 2rem 0;
+  font-style: italic;
+}
+
+.instance-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.instance-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: 6px;
+  background-color: transparent;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.instance-item:hover {
+  background-color: #334155;
+}
+
+.instance-item.active {
+  background-color: rgba(59, 130, 246, 0.2);
+}
+
+.instance-color {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.instance-name {
+  font-size: 0.85rem;
+  color: #cbd5e1;
+}
