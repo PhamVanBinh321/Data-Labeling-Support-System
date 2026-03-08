@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { ReactPictureAnnotation } from 'react-picture-annotation';
 import { ArrowLeft, Save, MousePointer2, Square, Tag } from 'lucide-react';
 import './LabelingWorkspace.css';
+import toast from 'react-hot-toast';
 
 // Mock data
 const mockTasks: Record<string, any> = {
@@ -65,8 +66,8 @@ const LabelingWorkspace: React.FC = () => {
 
   const handleSubmit = () => {
     console.log('Submitted annotations:', annotations);
-    alert('Đã lưu thành công!');
-    navigate('/annotator/tasks');
+    toast.success('✅ Đã nộp thành công! Task chuyển sang trạng thái In-Review.');
+    setTimeout(() => navigate('/annotator/tasks'), 1500);
   };
 
   // Helper function to extract bounding boxes for the right sidebar

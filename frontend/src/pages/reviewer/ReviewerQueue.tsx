@@ -4,6 +4,7 @@ import { Search, CheckCircle, XCircle, Eye } from 'lucide-react';
 import DataTable from '../../components/common/DataTable';
 import StatusBadge from '../../components/common/StatusBadge';
 import type { StatusType } from '../../components/common/StatusBadge';
+import toast from 'react-hot-toast';
 import './ReviewerQueue.css';
 
 // Mock Data structure for Reviewer Queue
@@ -84,14 +85,14 @@ const ReviewerQueue: React.FC = () => {
               <button 
                 className="btn btn-sm btn-outline-green" 
                 title="Phê duyệt nhanh"
-                onClick={(e) => { e.stopPropagation(); alert(`Đã phê duyệt Task ${item.id}`); }}
+                onClick={(e) => { e.stopPropagation(); toast.success(`✅ Đã phê duyệt Task #${item.id}`); }}
               >
                 <CheckCircle size={16} />
               </button>
               <button 
                 className="btn btn-sm btn-outline-red" 
                 title="Từ chối nhanh"
-                onClick={(e) => { e.stopPropagation(); alert(`Đã từ chối Task ${item.id}`); }}
+                onClick={(e) => { e.stopPropagation(); toast.error(`❌ Đã từ chối Task #${item.id}`); }}
               >
                 <XCircle size={16} />
               </button>

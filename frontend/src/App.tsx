@@ -6,11 +6,16 @@ import RegisterPage from './pages/RegisterPage';
 import RoleSelectionPage from './pages/RoleSelectionPage';
 import DashboardLayout from './layouts/DashboardLayout';
 import ManagerProjects from './pages/manager/ManagerProjects';
+import CreateProject from './pages/manager/CreateProject';
+import ProjectDetails from './pages/manager/ProjectDetails';
+import ManagerDatasets from './pages/manager/ManagerDatasets';
+import ManagerMembers from './pages/manager/ManagerMembers';
 import AnnotatorTasks from './pages/annotator/AnnotatorTasks';
 import LabelingWorkspace from './pages/annotator/LabelingWorkspace';
 import ReviewerQueue from './pages/reviewer/ReviewerQueue';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Navigate } from 'react-router-dom';
+import { Toaster } from 'react-hot-toast';
 
 // Simple wrapper for protected routes outside of DashboardLayout
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -22,6 +27,15 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 function App() {
   return (
     <AuthProvider>
+      <Toaster
+        position="top-right"
+        toastOptions={{
+          duration: 3500,
+          style: { fontFamily: 'inherit', fontSize: '0.9rem', borderRadius: '10px', boxShadow: '0 4px 20px rgba(0,0,0,.12)' },
+          success: { iconTheme: { primary: '#10b981', secondary: '#fff' } },
+          error:   { iconTheme: { primary: '#ef4444', secondary: '#fff' } },
+        }}
+      />
       <Router>
         <div className="app">
           <Routes>
@@ -45,6 +59,12 @@ function App() {
 
             {/* Dashboard Layout & Protected Routes */}
             <Route element={<DashboardLayout />}>
+              <Route path="/manager/projects" element={<ManagerProjects />} />
+              <Route path="/manager/projects/:projectId" element={<ProjectDetails />} />
+              <Route path="/manager/create-project" element={<CreateProject />} />
+              <Route path="/manager/datasets" element={<ManagerDatasets />} />
+              <Route path="/manager/members" element={<ManagerMembers />} />
+              <Route path="/manager" element={<ManagerProjects />} />
               <Route path="/manager/*" element={<ManagerProjects />} />
               <Route path="/annotator/*" element={<AnnotatorTasks />} />
               <Route path="/reviewer/*" element={<ReviewerQueue />} />

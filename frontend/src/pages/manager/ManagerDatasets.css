@@ -1,0 +1,255 @@
+/* ─── Shared page layout ─── */
+.manager-datasets-page,
+.manager-members-page {
+  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  max-width: 1200px;
+}
+
+.page-title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.page-title-row h1 {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0 0 0.3rem;
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.page-subtitle {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.9rem;
+}
+
+/* ─── Filter Row ─── */
+.filter-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.type-filters {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.type-filter-btn {
+  padding: 0.45rem 1rem;
+  border-radius: 7px;
+  border: 1px solid #e2e8f0;
+  background: white;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #64748b;
+  cursor: pointer;
+  transition: all .15s;
+}
+
+.type-filter-btn:hover {
+  border-color: #94a3b8;
+  color: #1e293b;
+}
+
+.type-filter-btn.active {
+  background: var(--primary-orange);
+  border-color: var(--primary-orange);
+  color: white;
+}
+
+/* ─── Dataset table cells ─── */
+.ds-name-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.ds-filename {
+  font-family: 'Fira Mono', monospace;
+  font-size: 0.85rem;
+  color: #1e293b;
+  word-break: break-all;
+}
+
+.dt-icon { flex-shrink: 0; }
+.dt-icon.image  { color: #3b82f6; }
+.dt-icon.video  { color: #a855f7; }
+.dt-icon.text   { color: #f59e0b; }
+
+.ds-type-badge {
+  padding: 0.2rem 0.6rem;
+  border-radius: 6px;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+.ds-type-badge.image  { background: #eff6ff; color: #3b82f6; }
+.ds-type-badge.video  { background: #faf5ff; color: #a855f7; }
+.ds-type-badge.text   { background: #fffbeb; color: #d97706; }
+
+.ds-proj-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: var(--primary-orange);
+  font-size: 0.875rem;
+  text-decoration: none;
+}
+.ds-proj-link:hover { text-decoration: underline; }
+
+.ds-source { color: #475569; font-size: 0.85rem; }
+
+.ds-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.25rem 0.65rem;
+  border-radius: 999px;
+  border: 1px solid;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+/* ─── Member Cards ─── */
+.members-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1.25rem;
+}
+
+.member-profile-card {
+  background: white;
+  border-radius: 16px;
+  padding: 1.5rem;
+  box-shadow: 0 1px 4px rgba(0,0,0,.08);
+  border: 1px solid #f1f5f9;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  transition: box-shadow .2s, transform .2s;
+}
+
+.member-profile-card:hover {
+  box-shadow: 0 6px 24px rgba(0,0,0,.1);
+  transform: translateY(-2px);
+}
+
+.mpc-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.mpc-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  color: white;
+  font-weight: 800;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mpc-role-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.7rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.mpc-name {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.mpc-email {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.8rem;
+  color: #64748b;
+}
+
+.mpc-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.mpc-stat {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.82rem;
+  color: #475569;
+}
+
+.mpc-stat-icon.gold { color: #f59e0b; }
+.mpc-stat-icon.blue { color: #3b82f6; }
+
+.mpc-projects {
+  margin-top: 0.25rem;
+}
+
+.mpc-projects-label {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  font-weight: 500;
+  display: block;
+  margin-bottom: 0.4rem;
+}
+
+.mpc-project-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.mpc-project-tag {
+  background: #f1f5f9;
+  color: #475569;
+  border-radius: 6px;
+  padding: 0.2rem 0.55rem;
+  font-size: 0.73rem;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 180px;
+}
+
+.mpc-footer {
+  margin-top: auto;
+  padding-top: 0.75rem;
+  border-top: 1px solid #f1f5f9;
+}
+
+.mpc-tasks-total {
+  font-size: 0.78rem;
+  color: #94a3b8;
+}
+
+.empty-state {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 3rem;
+  color: #94a3b8;
+  font-style: italic;
+  background: white;
+  border-radius: 12px;
+  border: 1px dashed #e2e8f0;
+}
