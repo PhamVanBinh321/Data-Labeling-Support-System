@@ -12,8 +12,11 @@ import ManagerDatasets from './pages/manager/ManagerDatasets';
 import ManagerMembers from './pages/manager/ManagerMembers';
 import AnnotatorTasks from './pages/annotator/AnnotatorTasks';
 import LabelingWorkspace from './pages/annotator/LabelingWorkspace';
+import AnnotatorPerformance from './pages/annotator/AnnotatorPerformance';
 import ReviewerQueue from './pages/reviewer/ReviewerQueue';
+import QualityMetrics from './pages/reviewer/QualityMetrics';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { DataProvider } from './context/DataContext';
 import { Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 
@@ -27,7 +30,8 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 function App() {
   return (
     <AuthProvider>
-      <Toaster
+      <DataProvider>
+        <Toaster
         position="top-right"
         toastOptions={{
           duration: 3500,
@@ -66,13 +70,18 @@ function App() {
               <Route path="/manager/members" element={<ManagerMembers />} />
               <Route path="/manager" element={<ManagerProjects />} />
               <Route path="/manager/*" element={<ManagerProjects />} />
+              <Route path="/annotator/tasks" element={<AnnotatorTasks />} />
+              <Route path="/annotator/performance" element={<AnnotatorPerformance />} />
               <Route path="/annotator/*" element={<AnnotatorTasks />} />
+              <Route path="/reviewer/queue" element={<ReviewerQueue />} />
+              <Route path="/reviewer/metrics" element={<QualityMetrics />} />
               <Route path="/reviewer/*" element={<ReviewerQueue />} />
             </Route>
 
           </Routes>
         </div>
       </Router>
+      </DataProvider>
     </AuthProvider>
   );
 }

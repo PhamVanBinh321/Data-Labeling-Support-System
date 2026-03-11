@@ -1,0 +1,47 @@
+.review-modal-content {
+  max-width: 500px;
+}
+
+.decision-buttons {
+  display: flex;
+  gap: 1rem;
+}
+
+.btn-decision {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  background-color: #f8fafc;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.btn-decision:hover {
+  background-color: #f1f5f9;
+}
+
+.btn-decision.active-approve {
+  border-color: #10b981;
+  background-color: #d1fae5;
+  color: #065f46;
+}
+
+.btn-decision.active-reject {
+  border-color: #ef4444;
+  background-color: #fee2e2;
+  color: #991b1b;
+}
+
+.mb-1rem {
+  margin-bottom: 1rem;
+}
+
+.mt-2rem {
+  margin-top: 2rem;
+}

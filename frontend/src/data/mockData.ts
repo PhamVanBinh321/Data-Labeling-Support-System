@@ -151,6 +151,7 @@ export interface Task {
   priority: 'High' | 'Medium' | 'Low';
   submittedAt?: string;
   qualityScore?: number;
+  rejectReason?: string;
 }
 
 export const MOCK_TASKS: Task[] = [

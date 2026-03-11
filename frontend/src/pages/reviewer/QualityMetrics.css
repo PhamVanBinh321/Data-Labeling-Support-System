@@ -1,0 +1,97 @@
+.quality-metrics-page {
+  padding: 1.5rem 2rem;
+  height: 100%;
+  overflow-y: auto;
+}
+
+.qm-header {
+  margin-bottom: 2rem;
+}
+
+.qm-header h1 {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 1.8rem;
+  color: #1e293b;
+  margin-bottom: 0.5rem;
+}
+
+.qm-icon {
+  color: #6366f1;
+}
+
+.qm-header p {
+  color: #64748b;
+  font-size: 1rem;
+}
+
+.mb-2rem {
+  margin-bottom: 2rem;
+}
+
+.qm-section {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  border: 1px solid #e2e8f0;
+  overflow: hidden;
+}
+
+.qm-section .section-header {
+  padding: 1.5rem;
+  border-bottom: 1px solid #e2e8f0;
+  background-color: #f8fafc;
+}
+
+.qm-section .section-header h2 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1.25rem;
+  color: #334155;
+}
+
+.metrics-progress-cell {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  min-width: 150px;
+}
+
+.rate-text {
+  font-weight: 600;
+  min-width: 40px;
+}
+
+.metrics-bar-bg {
+  flex: 1;
+  height: 8px;
+  background-color: #f1f5f9;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.metrics-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.5s ease-out;
+}
+
+.bg-green {
+  background-color: #10b981;
+}
+
+.bg-orange {
+  background-color: #f97316;
+}
+
+.bg-red {
+  background-color: #ef4444;
+}
+
+.empty-state {
+  padding: 3rem;
+  text-align: center;
+  color: #64748b;
+}

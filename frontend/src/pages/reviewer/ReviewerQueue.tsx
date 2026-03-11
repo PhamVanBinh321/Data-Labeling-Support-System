@@ -5,9 +5,9 @@ import DataTable from '../../components/common/DataTable';
 import StatusBadge from '../../components/common/StatusBadge';
 import type { StatusType } from '../../components/common/StatusBadge';
 import toast from 'react-hot-toast';
+import { useData } from '../../context/DataContext';
 import './ReviewerQueue.css';
 
-// Mock Data structure for Reviewer Queue
 interface ReviewTask {
   id: string;
   projectName: string;
@@ -15,29 +15,51 @@ interface ReviewTask {
   submittedAt: string;
   imagesCount: number;
   status: StatusType;
-  qualityScore?: number;
 }
-
-const mockReviewTasks: ReviewTask[] = [
-  { id: '1', projectName: 'Nhận diện biển số xe VN', annotatorName: 'Nguyễn Văn A', submittedAt: '10 phút trước', imagesCount: 150, status: 'in-review' },
-  { id: '2', projectName: 'Phân loại lỗi linh kiện điện tử', annotatorName: 'Trần Thị B', submittedAt: '1 giờ trước', imagesCount: 500, status: 'in-review', qualityScore: 98 },
-  { id: '3', projectName: 'Gắn nhãn cảm xúc bình luận', annotatorName: 'Lê Văn C', submittedAt: 'Hôm qua', imagesCount: 1000, status: 'approved', qualityScore: 100 },
-  { id: '4', projectName: 'Nhận diện biển số xe VN', annotatorName: 'Phạm Thị D', submittedAt: '2 ngày trước', imagesCount: 80, status: 'rejected', qualityScore: 45 },
-  { id: '5', projectName: 'Dự án Y tế - Đoán khối u MRI', annotatorName: 'Hoàng Văn E', submittedAt: 'Vừa xong', imagesCount: 50, status: 'in-review' },
-];
 
 const ReviewerQueue: React.FC = () => {
   const navigate = useNavigate();
+  const { tasks, getProjectById, getUserById, updateTaskStatus } = useData();
   const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState('');
 
-  const filteredTasks = filterStatus === 'all' 
-    ? mockReviewTasks 
-    : mockReviewTasks.filter(t => t.status === filterStatus);
+  const allReviewTasks: ReviewTask[] = tasks
+    .filter(t => ['in-review', 'approved', 'rejected', 'completed'].includes(t.status))
+    .map(t => ({
+      id: t.id,
+      projectName: getProjectById(t.projectId)?.name || 'Unknown',
+      annotatorName: getUserById(t.annotatorId)?.name || 'Unknown',
+      submittedAt: t.submittedAt || 'N/A',
+      imagesCount: t.totalImages,
+      status: t.status as StatusType
+    }));
+
+  let filteredTasks = filterStatus === 'all' 
+    ? allReviewTasks 
+    : allReviewTasks.filter(t => t.status === filterStatus);
+    
+  if (searchQuery) {
+    const q = searchQuery.toLowerCase();
+    filteredTasks = filteredTasks.filter(t => 
+      t.projectName.toLowerCase().includes(q) || 
+      t.annotatorName.toLowerCase().includes(q)
+    );
+  }
 
   const handleRowClick = (task: ReviewTask) => {
-    // In a real app, this would go to a specialized Review Workspace
-    // For now, we can just route to the standard workspace to "view" it
-    navigate(`/workspace/${task.id}`);
+    navigate(`/workspace/${task.id}?mode=reviewer`);
+  };
+
+  const handleApprove = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    updateTaskStatus(id, 'approved');
+    toast.success(`✅ Đã phê duyệt Task #${id}`);
+  };
+
+  const handleReject = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    updateTaskStatus(id, 'rejected', 'Bị từ chối nhanh từ Queue');
+    toast.error(`❌ Đã từ chối Task #${id}`);
   };
 
   const columns = [
@@ -53,22 +75,11 @@ const ReviewerQueue: React.FC = () => {
     { 
       key: 'imagesCount', 
       title: 'Số lượng Data',
-      render: (item: ReviewTask) => <span>{item.imagesCount} ảnh/dòng</span>
+      render: (item: ReviewTask) => <span>{item.imagesCount} ảnh</span>
     },
     { 
       key: 'submittedAt', 
       title: 'Thời gian nộp' 
-    },
-    { 
-      key: 'qualityScore', 
-      title: 'Điểm chất lượng',
-      render: (item: ReviewTask) => (
-        item.qualityScore !== undefined ? (
-          <span className={`quality-score ${item.qualityScore >= 90 ? 'text-green' : (item.qualityScore >= 70 ? 'text-orange' : 'text-red')}`}>
-            {item.qualityScore}%
-          </span>
-        ) : <span className="text-gray">-</span>
-      )
     },
     { 
       key: 'status', 
@@ -85,14 +96,14 @@ const ReviewerQueue: React.FC = () => {
               <button 
                 className="btn btn-sm btn-outline-green" 
                 title="Phê duyệt nhanh"
-                onClick={(e) => { e.stopPropagation(); toast.success(`✅ Đã phê duyệt Task #${item.id}`); }}
+                onClick={(e) => handleApprove(item.id, e)}
               >
                 <CheckCircle size={16} />
               </button>
               <button 
                 className="btn btn-sm btn-outline-red" 
                 title="Từ chối nhanh"
-                onClick={(e) => { e.stopPropagation(); toast.error(`❌ Đã từ chối Task #${item.id}`); }}
+                onClick={(e) => handleReject(item.id, e)}
               >
                 <XCircle size={16} />
               </button>
@@ -107,7 +118,7 @@ const ReviewerQueue: React.FC = () => {
           ) : (
             <button 
               className="btn btn-sm btn-secondary" 
-              title="Xem lại kỷ lục"
+              title="Xem lại"
               onClick={(e) => { e.stopPropagation(); handleRowClick(item); }}
             >
               <Eye size={16} /> Xem
@@ -118,13 +129,22 @@ const ReviewerQueue: React.FC = () => {
     }
   ];
 
+  const inReviewCount = allReviewTasks.filter(t => t.status === 'in-review').length;
+  const approvedCount = allReviewTasks.filter(t => t.status === 'approved' || t.status === 'completed').length;
+  const rejectedCount = allReviewTasks.filter(t => t.status === 'rejected').length;
+
   return (
     <div className="reviewer-queue-page animate-fade-in">
       <div className="page-header-actions">
         <div className="search-filter-group">
           <div className="search-box">
             <Search size={18} className="search-icon" />
-            <input type="text" placeholder="Tìm kiếm dự án, người gán nhãn..." />
+            <input 
+              type="text" 
+              placeholder="Tìm kiếm dự án, người gán nhãn..." 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
           </div>
           
           <select 
@@ -143,15 +163,15 @@ const ReviewerQueue: React.FC = () => {
       <div className="stats-row">
         <div className="stat-card">
           <span className="stat-label">Cần duyệt ngay</span>
-          <h3 className="stat-value text-purple">{mockReviewTasks.filter(t => t.status === 'in-review').length}</h3>
+          <h3 className="stat-value text-purple">{inReviewCount}</h3>
         </div>
         <div className="stat-card">
-          <span className="stat-label">Đã duyệt (Hôm nay)</span>
-          <h3 className="stat-value text-green">1</h3>
+          <span className="stat-label">Đã duyệt (Tổng)</span>
+          <h3 className="stat-value text-green">{approvedCount}</h3>
         </div>
         <div className="stat-card">
-          <span className="stat-label">Tỉ lệ đạt (Quality Rate)</span>
-          <h3 className="stat-value">98%</h3>
+          <span className="stat-label">Đã từ chối (Tổng)</span>
+          <h3 className="stat-value text-red">{rejectedCount}</h3>
         </div>
       </div>
 

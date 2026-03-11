@@ -1,165 +1,273 @@
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Filter, Clock, AlertTriangle } from 'lucide-react';
-import DataTable from '../../components/common/DataTable';
+import {
+  Search, Clock, AlertTriangle, CheckCircle,
+  XCircle, Eye, ChevronRight, ClipboardList
+} from 'lucide-react';
+import { MOCK_USERS } from '../../data/mockData';
+import type { Task } from '../../data/mockData';
+import { useData } from '../../context/DataContext';
 import StatusBadge from '../../components/common/StatusBadge';
 import type { StatusType } from '../../components/common/StatusBadge';
+import DataTable from '../../components/common/DataTable';
+import TaskDetailPanel from '../../components/annotator/TaskDetailPanel';
 import './AnnotatorTasks.css';
 
-// Mock Data structure for Annotator Tasks
-interface AnnotatorTask {
-  id: string;
-  projectName: string;
-  taskId: string;
-  type: string;
-  imagesCount: number;
-  completedImages: number;
-  status: StatusType;
-  deadline: string;
-  priority: 'High' | 'Medium' | 'Low';
-}
+// ── Logged-in annotator (always usr-002 for now) ──
+const ME = MOCK_USERS.find(u => u.id === 'usr-002')!;
 
-const mockTasks: AnnotatorTask[] = [
-  { id: '1', projectName: 'Nhận diện biển số xe VN', taskId: 'TASK-1001', type: 'Bounding Box', imagesCount: 150, completedImages: 45, status: 'in-progress', deadline: '2023-11-20', priority: 'High' },
-  { id: '2', projectName: 'Dự án Y tế - Đoán khối u MRI', taskId: 'TASK-2045', type: 'Segmentation', imagesCount: 50, completedImages: 0, status: 'pending', deadline: '2023-11-22', priority: 'Medium' },
-  { id: '3', projectName: 'Phân loại lỗi linh kiện điện tử', taskId: 'TASK-0982', type: 'Classification', imagesCount: 500, completedImages: 500, status: 'completed', deadline: '2023-11-15', priority: 'Low' },
-  { id: '4', projectName: 'Gắn nhãn cảm xúc bình luận', taskId: 'TASK-3312', type: 'Text Classification', imagesCount: 1000, completedImages: 1000, status: 'in-review', deadline: '2023-11-18', priority: 'Medium' },
-  { id: '5', projectName: 'Nhận diện biển số xe VN', taskId: 'TASK-1005', type: 'Bounding Box', imagesCount: 80, completedImages: 80, status: 'rejected', deadline: '2023-11-19', priority: 'High' },
-];
+type FilterTab = 'all' | 'todo' | 'in-review' | 'done' | 'rejected';
+
+const TAB_LABELS: Record<FilterTab, string> = {
+  all:       'Tất cả',
+  todo:      'Cần làm',
+  'in-review': 'Đang duyệt',
+  done:      'Xong',
+  rejected:  'Bị trả về',
+};
+
+const FILTER_FN: Record<FilterTab, (t: Task) => boolean> = {
+  all:       () => true,
+  todo:      t => t.status === 'pending' || t.status === 'in-progress',
+  'in-review': t => t.status === 'in-review',
+  done:      t => t.status === 'approved' || t.status === 'completed',
+  rejected:  t => t.status === 'rejected',
+};
+
+const PRIORITY_ICON = {
+  High:   <AlertTriangle size={14} className="priority-icon high" />,
+  Medium: <Clock size={14} className="priority-icon medium" />,
+  Low:    null,
+};
 
 const AnnotatorTasks: React.FC = () => {
   const navigate = useNavigate();
+  const { tasks, projects } = useData();
+  const [search, setSearch] = useState('');
+  const [activeTab, setActiveTab] = useState<FilterTab>('all');
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
 
-  const handleRowClick = (task: AnnotatorTask) => {
-    // Only navigate if the task is actionable (not completed/in-review)
-    if (task.status === 'pending' || task.status === 'in-progress' || task.status === 'rejected') {
-       navigate(`/workspace/${task.id}`);
-    } else {
-      console.log('Task is not actionable right now:', task.status);
-    }
+  // All tasks assigned to current annotator
+  const myTasks = useMemo(
+    () => tasks.filter(t => t.annotatorId === ME.id),
+    [tasks]
+  );
+
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase();
+    return myTasks
+      .filter(FILTER_FN[activeTab])
+      .filter(t => {
+        const proj = projects.find(p => p.id === t.projectId);
+        return (
+          t.name.toLowerCase().includes(q) ||
+          (proj?.name ?? '').toLowerCase().includes(q)
+        );
+      });
+  }, [myTasks, activeTab, search, projects]);
+
+  // Dynamic stats
+  const stats = useMemo(() => ({
+    todo:     myTasks.filter(FILTER_FN.todo).length,
+    rejected: myTasks.filter(FILTER_FN.rejected).length,
+    done:     myTasks.filter(FILTER_FN.done).length,
+    inReview: myTasks.filter(FILTER_FN['in-review']).length,
+  }), [myTasks]);
+
+  const handleAction = (task: Task) => {
+    // Row click → open detail drawer
+    setSelectedTask(task);
   };
 
-  const calculateProgress = (completed: number, total: number) => {
-    if (total === 0) return 0;
-    return Math.round((completed / total) * 100);
+  const handleOpenWorkspace = (task: Task) => {
+    const actionable = ['pending', 'in-progress', 'rejected'].includes(task.status);
+    if (actionable) navigate(`/workspace/${task.id}`);
   };
 
-  const getPriorityIcon = (priority: string) => {
-    switch(priority) {
-      case 'High': return <AlertTriangle size={16} className="text-red" />;
-      case 'Medium': return <Clock size={16} className="text-orange" />;
-      default: return null;
-    }
+  const tabCount = (tab: FilterTab) => {
+    const n = myTasks.filter(FILTER_FN[tab]).length;
+    return n > 0 ? <span className="tab-count">{n}</span> : null;
   };
 
   const columns = [
-    { 
-      key: 'taskId', 
-      title: 'Mã Task',
-      render: (item: AnnotatorTask) => <strong className="task-id-cell">{item.taskId}</strong> 
-    },
-    { 
-      key: 'projectName', 
-      title: 'Dự án',
-      render: (item: AnnotatorTask) => (
-        <div className="project-info-cell">
-          <span className="project-name">{item.projectName}</span>
-          <span className="task-type">{item.type}</span>
-        </div>
-      )
-    },
-    { 
-      key: 'progress', 
-      title: 'Tiến độ',
-      render: (item: AnnotatorTask) => {
-        const percent = calculateProgress(item.completedImages, item.imagesCount);
+    {
+      key: 'name',
+      title: 'Task',
+      render: (t: Task) => {
+        const proj = projects.find(p => p.id === t.projectId);
         return (
-          <div className="task-progress-cell">
-             <div className="progress-numbers">
-                <span>{item.completedImages} / {item.imagesCount}</span>
-                <span className="progress-percent">{percent}%</span>
-             </div>
-             <div className="progress-bar-bg-sm">
-               <div className="progress-bar-fill-sm" style={{ width: `${percent}%`, backgroundColor: percent === 100 ? '#10b981' : '#f97316' }}></div>
-             </div>
+          <div className="task-name-cell">
+            <strong>{t.name}</strong>
+            {t.status === 'rejected' && t.rejectReason && (
+              <span className="rejected-hint">
+                <XCircle size={12} /> Có phản hồi từ Reviewer
+              </span>
+            )}
+            <span className="at-project-name">{proj?.name ?? '—'}</span>
           </div>
         );
-      }
+      },
     },
-    { 
-      key: 'deadline', 
+    {
+      key: 'type',
+      title: 'Loại',
+      render: (t: Task) => {
+        const proj = projects.find(p => p.id === t.projectId);
+        return <span className="type-badge">{proj?.typeName ?? '—'}</span>;
+      },
+    },
+    {
+      key: 'progress',
+      title: 'Tiến độ',
+      render: (t: Task) => {
+        const pct = t.totalImages > 0 ? Math.round((t.completedImages / t.totalImages) * 100) : 0;
+        return (
+          <div className="task-progress-cell">
+            <div className="progress-numbers">
+              <span>{t.completedImages}/{t.totalImages} ảnh</span>
+              <span className="progress-percent">{pct}%</span>
+            </div>
+            <div className="progress-bar-bg-sm">
+              <div
+                className="progress-bar-fill-sm"
+                style={{ width: `${pct}%`, backgroundColor: pct === 100 ? '#10b981' : '#f97316' }}
+              />
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      key: 'deadline',
       title: 'Hạn chót',
-      render: (item: AnnotatorTask) => (
+      render: (t: Task) => (
         <div className="deadline-cell">
-          {getPriorityIcon(item.priority)}
-          <span className={item.priority === 'High' ? 'text-red font-medium' : ''}>{item.deadline}</span>
+          {PRIORITY_ICON[t.priority]}
+          <span className={t.priority === 'High' ? 'text-red font-medium' : ''}>{t.deadline}</span>
         </div>
-      )
+      ),
     },
-    { 
-      key: 'status', 
+    {
+      key: 'status',
       title: 'Trạng thái',
-      render: (item: AnnotatorTask) => <StatusBadge status={item.status} />
+      render: (t: Task) => <StatusBadge status={t.status as StatusType} />,
     },
     {
       key: 'action',
-      title: 'Thao tác',
-      render: (item: AnnotatorTask) => {
-         const isActionable = item.status === 'pending' || item.status === 'in-progress' || item.status === 'rejected';
-         return (
-           <button 
-             className={`btn btn-sm ${isActionable ? 'btn-primary' : 'btn-secondary'}`}
-             onClick={(e) => {
-                e.stopPropagation(); // Prevent row click
-                if (isActionable) handleRowClick(item);
-             }}
-             disabled={!isActionable}
-           >
-             {item.status === 'rejected' ? 'Làm lại' : (isActionable ? 'Bắt đầu' : 'Xem')}
-           </button>
-         );
-      }
-    }
+      title: '',
+      render: (t: Task) => {
+        const actionable = ['pending', 'in-progress', 'rejected'].includes(t.status);
+        const label =
+          t.status === 'rejected'   ? 'Làm lại' :
+          t.status === 'in-progress' ? 'Tiếp tục' :
+          t.status === 'pending'    ? 'Bắt đầu' :
+          'Xem';
+        const icon = actionable ? <ChevronRight size={15} /> : <Eye size={15} />;
+        return (
+          <button
+            className={`btn btn-sm btn-icon-text ${actionable ? 'btn-primary' : 'btn-ghost'}`}
+            onClick={(e) => { e.stopPropagation(); handleOpenWorkspace(t); }}
+            disabled={t.status === 'in-review' || t.status === 'approved' || t.status === 'completed'}
+          >
+            {label} {icon}
+          </button>
+        );
+      },
+    },
   ];
 
   return (
     <div className="annotator-tasks-page animate-fade-in">
-      <div className="page-header-actions">
-        <div className="search-filter-group">
-          <div className="search-box">
-            <Search size={18} className="search-icon" />
-            <input type="text" placeholder="Tìm kiếm theo mã task, dự án..." />
-          </div>
-          <button className="btn btn-secondary btn-icon-text">
-            <Filter size={18} />
-            <span>Bộ lọc</span>
-          </button>
+
+      {/* Page title */}
+      <div className="at-page-header">
+        <div>
+          <h1><ClipboardList size={22} /> Danh sách Task của tôi</h1>
+          <p className="page-subtitle">Xin chào, <strong>{ME.name}</strong>! Dưới đây là các task được giao cho bạn.</p>
         </div>
       </div>
 
+      {/* Stats row */}
       <div className="stats-row">
         <div className="stat-card">
-          <span className="stat-label">Task cần làm</span>
-          <h3 className="stat-value text-orange">3</h3>
+          <span className="stat-label">Cần làm</span>
+          <h3 className="stat-value text-orange">{stats.todo}</h3>
         </div>
         <div className="stat-card">
-          <span className="stat-label">Task bị trả về</span>
-          <h3 className="stat-value text-red">1</h3>
+          <span className="stat-label">Đang duyệt</span>
+          <h3 className="stat-value" style={{ color: '#6366f1' }}>{stats.inReview}</h3>
         </div>
         <div className="stat-card">
-          <span className="stat-label">Đã hoàn thành</span>
-          <h3 className="stat-value text-green">1</h3>
+          <span className="stat-label">Bị trả về</span>
+          <h3 className="stat-value text-red">{stats.rejected}</h3>
+        </div>
+        <div className="stat-card">
+          <span className="stat-label">Đã xong</span>
+          <h3 className="stat-value text-green">{stats.done}</h3>
         </div>
       </div>
 
-      <div className="table-wrapper">
-        <DataTable<AnnotatorTask> 
-          data={mockTasks} 
-          columns={columns} 
-          keyExtractor={(item) => item.id}
-          onRowClick={handleRowClick}
-        />
+      {/* Rejected banner */}
+      {stats.rejected > 0 && (
+        <div className="rejected-banner">
+          <XCircle size={18} />
+          <div>
+            <strong>Bạn có {stats.rejected} task bị Reviewer từ chối!</strong>
+            <span> Vui lòng xem phản hồi và làm lại để đảm bảo chất lượng.</span>
+          </div>
+          <button className="btn btn-sm btn-outline-red" onClick={() => setActiveTab('rejected')}>
+            Xem ngay
+          </button>
+        </div>
+      )}
+
+      {/* Search + Filter tabs */}
+      <div className="at-toolbar">
+        <div className="search-box">
+          <Search size={16} className="search-icon" />
+          <input
+            type="text"
+            placeholder="Tìm task hoặc tên dự án..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
+        </div>
+        <div className="at-filter-tabs">
+          {(Object.keys(TAB_LABELS) as FilterTab[]).map(tab => (
+            <button
+              key={tab}
+              className={`at-tab ${activeTab === tab ? 'active' : ''} ${tab === 'rejected' && stats.rejected > 0 ? 'has-alert' : ''}`}
+              onClick={() => setActiveTab(tab)}
+            >
+              {TAB_LABELS[tab]} {tabCount(tab)}
+            </button>
+          ))}
+        </div>
       </div>
+
+      {/* Table */}
+      {filtered.length === 0 ? (
+        <div className="at-empty">
+          <CheckCircle size={48} className="at-empty-icon" />
+          <p>Không có task nào phù hợp.</p>
+        </div>
+      ) : (
+        <DataTable<Task>
+          data={filtered}
+          columns={columns}
+          keyExtractor={t => t.id}
+          onRowClick={handleAction}
+          pageSize={8}
+        />
+      )}
+
+      {/* Task Detail Panel */}
+      {selectedTask && (
+        <TaskDetailPanel
+          task={selectedTask}
+          onClose={() => setSelectedTask(null)}
+        />
+      )}
     </div>
   );
 };
