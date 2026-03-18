@@ -1,6 +1,9 @@
+from django.contrib import admin
 from django.urls import path, include
+from users.views import health_check
 
 urlpatterns = [
+    path('admin/', admin.site.urls),
     path('api/auth/', include('users.urls')),
-    path('health', __import__('users.views', fromlist=['health_check']).health_check),
+    path('health', health_check),
 ]
