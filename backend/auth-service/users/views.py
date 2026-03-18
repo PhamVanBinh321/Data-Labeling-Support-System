@@ -1,3 +1,4 @@
+from django.db import models as db_models
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -217,3 +218,54 @@ def set_role(request):
         data=UserSerializer(user).data,
         message=f'Role đã được đặt thành "{user.get_role_display()}".',
     )
+
+
+# ─── Internal APIs ────────────────────────────────────────────────────────────
+# Các service khác (project, task, ...) gọi những endpoint này để lấy thông tin
+# user mà không cần truy cập trực tiếp vào auth DB.
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def list_users(request):
+    """
+    GET /api/auth/users/?role=annotator&search=nguyen
+    Manager dùng khi invite member vào project.
+    """
+    queryset = User.objects.filter(is_active=True, role_confirmed=True)
+
+    role = request.query_params.get('role')
+    if role:
+        queryset = queryset.filter(role=role)
+
+    search = request.query_params.get('search', '').strip()
+    if search:
+        queryset = queryset.filter(
+            db_models.Q(first_name__icontains=search)
+            | db_models.Q(last_name__icontains=search)
+            | db_models.Q(email__icontains=search)
+        )
+
+    # Loại bỏ chính người đang gọi
+    queryset = queryset.exclude(id=request.user.id)
+
+    return success_response(
+        data=UserSerializer(queryset, many=True).data,
+        message='',
+    )
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_user(request, user_id):
+    """
+    GET /api/auth/users/<user_id>/
+    Internal endpoint — project/task service gọi để lấy thông tin 1 user.
+    """
+    try:
+        user = User.objects.get(id=user_id, is_active=True)
+    except User.DoesNotExist:
+        return error_response(
+            message=f'Không tìm thấy user với id={user_id}.',
+            status=status.HTTP_404_NOT_FOUND,
+        )
+    return success_response(data=UserSerializer(user).data, message='')
