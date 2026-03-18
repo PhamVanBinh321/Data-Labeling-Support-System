@@ -128,3 +128,92 @@ def refresh_token(request):
             message='Refresh token không hợp lệ hoặc đã hết hạn.',
             status=status.HTTP_401_UNAUTHORIZED,
         )
+
+
+# ─── Profile endpoints ────────────────────────────────────────────────────────
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def me(request):
+    """
+    GET /api/auth/me/
+    Trả về thông tin user đang đăng nhập.
+    """
+    return success_response(
+        data=UserSerializer(request.user).data,
+        message='',
+    )
+
+
+@api_view(['PATCH'])
+@permission_classes([IsAuthenticated])
+def update_profile(request):
+    """
+    PATCH /api/auth/me/
+    Body: { name?, avatar? }
+    """
+    serializer = UpdateProfileSerializer(
+        instance=request.user,
+        data=request.data,
+        partial=True,
+    )
+    if not serializer.is_valid():
+        return error_response(
+            message='Dữ liệu không hợp lệ.',
+            errors=serializer.errors,
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    user = serializer.save()
+    return success_response(
+        data=UserSerializer(user).data,
+        message='Cập nhật thông tin thành công.',
+    )
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def change_password(request):
+    """
+    POST /api/auth/me/change-password/
+    Body: { old_password, new_password, confirm_password }
+    """
+    serializer = ChangePasswordSerializer(
+        data=request.data,
+        context={'request': request},
+    )
+    if not serializer.is_valid():
+        return error_response(
+            message='Không thể đổi mật khẩu.',
+            errors=serializer.errors,
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    request.user.set_password(serializer.validated_data['new_password'])
+    request.user.save(update_fields=['password', 'updated_at'])
+    return success_response(message='Đổi mật khẩu thành công. Vui lòng đăng nhập lại.')
+
+
+@api_view(['PATCH'])
+@permission_classes([IsAuthenticated])
+def set_role(request):
+    """
+    PATCH /api/auth/me/role/
+    Body: { role }  — chỉ set được 1 lần.
+    """
+    serializer = SetRoleSerializer(
+        data=request.data,
+        context={'request': request},
+    )
+    if not serializer.is_valid():
+        return error_response(
+            message='Không thể đặt role.',
+            errors=serializer.errors,
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    user = request.user
+    user.role = serializer.validated_data['role']
+    user.role_confirmed = True
+    user.save(update_fields=['role', 'role_confirmed', 'updated_at'])
+    return success_response(
+        data=UserSerializer(user).data,
+        message=f'Role đã được đặt thành "{user.get_role_display()}".',
+    )
