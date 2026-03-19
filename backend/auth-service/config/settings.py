@@ -15,6 +15,7 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt',
     'rest_framework_simplejwt.token_blacklist',
     'corsheaders',
+    'drf_spectacular',
     'users.apps.UsersConfig',
 ]
 
@@ -75,6 +76,13 @@ REST_FRAMEWORK = {
         'rest_framework.permissions.IsAuthenticated',
     ),
     'EXCEPTION_HANDLER': 'config.exceptions.custom_exception_handler',
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+}
+
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'Auth Service API',
+    'DESCRIPTION': 'Xác thực, đăng ký, quản lý hồ sơ người dùng.',
+    'VERSION': '1.0.0',
 }
 
 # ── JWT ───────────────────────────────────────────────────────────────────────
