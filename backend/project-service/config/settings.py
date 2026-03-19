@@ -45,7 +45,7 @@ AUTH_SERVICE_URL = config('AUTH_SERVICE_URL', default='http://auth-service:8001'
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'projects.backends.ServiceJWTAuthentication',
     ),
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated',

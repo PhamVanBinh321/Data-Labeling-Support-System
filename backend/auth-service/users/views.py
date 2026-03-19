@@ -2,8 +2,10 @@ from django.db import models as db_models
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
-from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
+from rest_framework_simplejwt.tokens import RefreshToken
+
+from .tokens import CustomRefreshToken
 
 from .models import User
 from .serializers import (
@@ -16,7 +18,7 @@ from .utils import success_response, error_response
 
 def _make_token_data(user):
     """Tạo JWT tokens + user info để trả về sau login/register."""
-    refresh = RefreshToken.for_user(user)
+    refresh = CustomRefreshToken.for_user(user)
     return {
         'user': UserSerializer(user).data,
         'access_token': str(refresh.access_token),
