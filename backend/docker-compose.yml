@@ -140,6 +140,8 @@ services:
       context: ./annotation-service
       dockerfile: Dockerfile
     container_name: dlss_annotation
+    ports:
+      - "8004:8004"
     env_file: ./annotation-service/.env
     environment:
       - DATABASE_URL=postgresql://annotation_user:annotation_pass@annotation-db:5432/annotation_db
