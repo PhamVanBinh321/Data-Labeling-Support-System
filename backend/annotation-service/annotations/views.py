@@ -7,6 +7,7 @@ from .models import ImageFile, Annotation
 from .serializers import (
     ImageFileSerializer, ImageUploadSerializer,
     AnnotationSerializer, AnnotationCreateSerializer, AnnotationUpdateSerializer,
+    BulkAnnotationSerializer,
 )
 from .permissions import IsAnnotatorOrReviewerOrManager, IsAnnotator, IsInternalService
 from .utils import success_response, error_response
@@ -215,3 +216,68 @@ class AnnotationDetailView(APIView):
 
         annotation.delete()
         return success_response(message='Đã xóa annotation.')
+
+
+# ─── BULK SAVE + TASK WORKFLOW VIEWS ─────────────────────────────────────────
+
+class BulkAnnotationSaveView(APIView):
+    """
+    POST /api/annotations/images/<pk>/annotations/bulk-save/
+
+    Annotator save toàn bộ annotations của 1 ảnh cùng lúc (atomic).
+    Xóa hết annotations cũ, insert lại từ đầu.
+    Body: { "annotations": [ { label_id, label_name, ... }, ... ] }
+    """
+    permission_classes = [IsAuthenticated, IsAnnotator]
+
+    def post(self, request, pk):
+        try:
+            image = ImageFile.objects.get(pk=pk)
+        except ImageFile.DoesNotExist:
+            return error_response('Không tìm thấy ảnh.', status=404)
+
+        serializer = BulkAnnotationSerializer(data=request.data)
+        if not serializer.is_valid():
+            return error_response('Dữ liệu không hợp lệ.', errors=serializer.errors)
+
+        items = serializer.validated_data['annotations']
+
+        with transaction.atomic():
+            # Xóa toàn bộ annotations cũ của ảnh này
+            Annotation.objects.filter(image=image).delete()
+
+            # Insert lại
+            new_annotations = [
+                Annotation(image=image, created_by=request.user.id, **item)
+                for item in items
+            ]
+            Annotation.objects.bulk_create(new_annotations)
+
+        saved = Annotation.objects.filter(image=image).order_by('created_at')
+        return success_response(
+            AnnotationSerializer(saved, many=True).data,
+            message=f'Đã lưu {len(new_annotations)} annotation.',
+        )
+
+
+class TaskImagesWithAnnotationsView(APIView):
+    """
+    GET /api/annotations/tasks/<task_id>/images/
+
+    Reviewer xem toàn bộ ảnh + annotations của 1 task để review.
+    Trả về list ảnh, mỗi ảnh kèm nested annotations.
+    """
+    permission_classes = [IsAuthenticated, IsAnnotatorOrReviewerOrManager]
+
+    def get(self, request, task_id):
+        images = ImageFile.objects.filter(task_id=task_id).order_by('index')
+
+        result = []
+        for image in images:
+            annotations = Annotation.objects.filter(image=image).order_by('created_at')
+            result.append({
+                **ImageFileSerializer(image).data,
+                'annotations': AnnotationSerializer(annotations, many=True).data,
+            })
+
+        return success_response(result)
