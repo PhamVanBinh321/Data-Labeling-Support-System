@@ -95,3 +95,119 @@ class ImageUploadSerializer(serializers.Serializer):
             width=width,
             height=height,
         )
+
+
+# ─── ANNOTATION SERIALIZERS ───────────────────────────────────────────────────
+
+class AnnotationSerializer(serializers.ModelSerializer):
+    """Serializer output đầy đủ cho Annotation."""
+
+    class Meta:
+        model = Annotation
+        fields = (
+            'id', 'image_id',
+            'label_id', 'label_name', 'label_color',
+            'x', 'y', 'width', 'height', 'points',
+            'annotation_type', 'comment',
+            'created_by', 'created_at', 'updated_at',
+        )
+        read_only_fields = ('id', 'created_by', 'created_at', 'updated_at')
+
+
+class AnnotationCreateSerializer(serializers.Serializer):
+    """Validate dữ liệu khi tạo 1 annotation mới."""
+
+    image_id = serializers.IntegerField(min_value=1)
+    label_id = serializers.CharField(max_length=100)
+    label_name = serializers.CharField(max_length=100)
+    label_color = serializers.CharField(max_length=7)
+    annotation_type = serializers.ChoiceField(
+        choices=Annotation.AnnotationType.choices,
+        default=Annotation.AnnotationType.BOUNDING_BOX,
+    )
+    x = serializers.FloatField(default=0, min_value=0)
+    y = serializers.FloatField(default=0, min_value=0)
+    width = serializers.FloatField(default=0, min_value=0)
+    height = serializers.FloatField(default=0, min_value=0)
+    points = serializers.ListField(
+        child=serializers.ListField(child=serializers.FloatField(), min_length=2, max_length=2),
+        required=False,
+        allow_null=True,
+    )
+    comment = serializers.CharField(max_length=500, required=False, allow_blank=True, default='')
+
+    def validate_label_color(self, value):
+        if not value.startswith('#') or len(value) != 7:
+            raise serializers.ValidationError('label_color phải là hex color (#RRGGBB).')
+        return value
+
+    def validate(self, data):
+        ann_type = data.get('annotation_type', Annotation.AnnotationType.BOUNDING_BOX)
+        if ann_type == Annotation.AnnotationType.POLYGON:
+            points = data.get('points')
+            if not points or len(points) < 3:
+                raise serializers.ValidationError(
+                    {'points': 'Polygon cần ít nhất 3 điểm.'}
+                )
+        return data
+
+
+class AnnotationUpdateSerializer(serializers.Serializer):
+    """Partial update — chỉ cho phép sửa tọa độ, label, comment."""
+
+    label_id = serializers.CharField(max_length=100, required=False)
+    label_name = serializers.CharField(max_length=100, required=False)
+    label_color = serializers.CharField(max_length=7, required=False)
+    x = serializers.FloatField(min_value=0, required=False)
+    y = serializers.FloatField(min_value=0, required=False)
+    width = serializers.FloatField(min_value=0, required=False)
+    height = serializers.FloatField(min_value=0, required=False)
+    points = serializers.ListField(
+        child=serializers.ListField(child=serializers.FloatField(), min_length=2, max_length=2),
+        required=False,
+        allow_null=True,
+    )
+    comment = serializers.CharField(max_length=500, required=False, allow_blank=True)
+
+    def validate_label_color(self, value):
+        if not value.startswith('#') or len(value) != 7:
+            raise serializers.ValidationError('label_color phải là hex color (#RRGGBB).')
+        return value
+
+
+class BulkAnnotationItemSerializer(serializers.Serializer):
+    """Một item trong bulk save — không cần image_id (lấy từ URL)."""
+
+    label_id = serializers.CharField(max_length=100)
+    label_name = serializers.CharField(max_length=100)
+    label_color = serializers.CharField(max_length=7)
+    annotation_type = serializers.ChoiceField(
+        choices=Annotation.AnnotationType.choices,
+        default=Annotation.AnnotationType.BOUNDING_BOX,
+    )
+    x = serializers.FloatField(default=0, min_value=0)
+    y = serializers.FloatField(default=0, min_value=0)
+    width = serializers.FloatField(default=0, min_value=0)
+    height = serializers.FloatField(default=0, min_value=0)
+    points = serializers.ListField(
+        child=serializers.ListField(child=serializers.FloatField(), min_length=2, max_length=2),
+        required=False,
+        allow_null=True,
+    )
+    comment = serializers.CharField(max_length=500, required=False, allow_blank=True, default='')
+
+    def validate_label_color(self, value):
+        if not value.startswith('#') or len(value) != 7:
+            raise serializers.ValidationError('label_color phải là hex color (#RRGGBB).')
+        return value
+
+
+class BulkAnnotationSerializer(serializers.Serializer):
+    """
+    Nhận danh sách annotations cho 1 ảnh.
+    Dùng cho bulk-save: xóa toàn bộ cũ, insert lại từ đầu (atomic).
+    """
+    annotations = serializers.ListField(
+        child=BulkAnnotationItemSerializer(),
+        allow_empty=True,
+    )
