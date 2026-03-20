@@ -4,7 +4,10 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.parsers import MultiPartParser, FormParser
 
 from .models import ImageFile, Annotation
-from .serializers import ImageFileSerializer, ImageUploadSerializer
+from .serializers import (
+    ImageFileSerializer, ImageUploadSerializer,
+    AnnotationSerializer, AnnotationCreateSerializer, AnnotationUpdateSerializer,
+)
 from .permissions import IsAnnotatorOrReviewerOrManager, IsAnnotator, IsInternalService
 from .utils import success_response, error_response
 
@@ -115,3 +118,100 @@ class ImageConfirmView(APIView):
             ImageFileSerializer(image).data,
             message='Đã confirm ảnh.',
         )
+
+
+# ─── ANNOTATION CRUD VIEWS ────────────────────────────────────────────────────
+
+class AnnotationListCreateView(APIView):
+    """
+    GET  /api/annotations/?image_id=<id>   — list annotations của 1 ảnh
+    POST /api/annotations/                 — tạo 1 annotation mới
+    """
+    permission_classes = [IsAuthenticated, IsAnnotatorOrReviewerOrManager]
+
+    def get(self, request):
+        image_id = request.query_params.get('image_id')
+        if not image_id:
+            return error_response('Thiếu image_id.', status=400)
+
+        annotations = Annotation.objects.filter(image_id=image_id).order_by('created_at')
+        serializer = AnnotationSerializer(annotations, many=True)
+        return success_response(serializer.data)
+
+    def post(self, request):
+        serializer = AnnotationCreateSerializer(data=request.data)
+        if not serializer.is_valid():
+            return error_response('Dữ liệu không hợp lệ.', errors=serializer.errors)
+
+        data = serializer.validated_data
+        image_id = data.pop('image_id')
+
+        try:
+            image = ImageFile.objects.get(pk=image_id)
+        except ImageFile.DoesNotExist:
+            return error_response('Không tìm thấy ảnh.', status=404)
+
+        annotation = Annotation.objects.create(
+            image=image,
+            created_by=request.user.id,
+            **data,
+        )
+        return success_response(
+            AnnotationSerializer(annotation).data,
+            message='Tạo annotation thành công.',
+            status=201,
+        )
+
+
+class AnnotationDetailView(APIView):
+    """
+    GET    /api/annotations/<pk>/
+    PATCH  /api/annotations/<pk>/
+    DELETE /api/annotations/<pk>/
+    """
+    permission_classes = [IsAuthenticated, IsAnnotatorOrReviewerOrManager]
+
+    def _get_annotation(self, pk):
+        try:
+            return Annotation.objects.get(pk=pk)
+        except Annotation.DoesNotExist:
+            return None
+
+    def get(self, request, pk):
+        annotation = self._get_annotation(pk)
+        if not annotation:
+            return error_response('Không tìm thấy annotation.', status=404)
+        return success_response(AnnotationSerializer(annotation).data)
+
+    def patch(self, request, pk):
+        annotation = self._get_annotation(pk)
+        if not annotation:
+            return error_response('Không tìm thấy annotation.', status=404)
+
+        # Chỉ người tạo hoặc manager mới được sửa
+        if annotation.created_by != request.user.id and request.user.role != 'manager':
+            return error_response('Bạn không có quyền sửa annotation này.', status=403)
+
+        serializer = AnnotationUpdateSerializer(data=request.data)
+        if not serializer.is_valid():
+            return error_response('Dữ liệu không hợp lệ.', errors=serializer.errors)
+
+        for field, value in serializer.validated_data.items():
+            setattr(annotation, field, value)
+        annotation.save()
+
+        return success_response(
+            AnnotationSerializer(annotation).data,
+            message='Cập nhật annotation thành công.',
+        )
+
+    def delete(self, request, pk):
+        annotation = self._get_annotation(pk)
+        if not annotation:
+            return error_response('Không tìm thấy annotation.', status=404)
+
+        if annotation.created_by != request.user.id and request.user.role != 'manager':
+            return error_response('Bạn không có quyền xóa annotation này.', status=403)
+
+        annotation.delete()
+        return success_response(message='Đã xóa annotation.')
