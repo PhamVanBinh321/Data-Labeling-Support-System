@@ -1,6 +1,11 @@
+import csv
+import json
+from io import StringIO
+
 from django.db import transaction
+from django.http import HttpResponse
 from rest_framework.views import APIView
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.parsers import MultiPartParser, FormParser
 
 from .models import ImageFile, Annotation
@@ -281,3 +286,175 @@ class TaskImagesWithAnnotationsView(APIView):
             })
 
         return success_response(result)
+
+
+# ─── EXPORT VIEWS ─────────────────────────────────────────────────────────────
+
+class TaskExportView(APIView):
+    """
+    GET /api/annotations/tasks/<task_id>/export/?format=coco|yolo|csv
+
+    Export toàn bộ annotations của task ra file download.
+    - coco  → JSON theo COCO format
+    - yolo  → .txt files gộp trong JSON (relative coords)
+    - csv   → CSV file
+    """
+    permission_classes = [IsAuthenticated, IsAnnotatorOrReviewerOrManager]
+
+    def get(self, request, task_id):
+        fmt = request.query_params.get('format', 'coco').lower()
+        if fmt not in ('coco', 'yolo', 'csv'):
+            return error_response('format phải là coco, yolo hoặc csv.', status=400)
+
+        images = ImageFile.objects.filter(task_id=task_id).prefetch_related('annotations').order_by('index')
+        if not images.exists():
+            return error_response('Không có ảnh nào trong task này.', status=404)
+
+        if fmt == 'coco':
+            return self._export_coco(task_id, images)
+        elif fmt == 'yolo':
+            return self._export_yolo(task_id, images)
+        else:
+            return self._export_csv(task_id, images)
+
+    def _export_coco(self, task_id, images):
+        coco = {
+            'info': {'task_id': task_id, 'version': '1.0'},
+            'images': [],
+            'annotations': [],
+            'categories': [],
+        }
+        category_map = {}
+        ann_id = 1
+
+        for image in images:
+            coco['images'].append({
+                'id': image.id,
+                'file_name': image.original_filename,
+                'width': image.width,
+                'height': image.height,
+            })
+            for ann in image.annotations.all():
+                if ann.label_id not in category_map:
+                    cat_id = len(category_map) + 1
+                    category_map[ann.label_id] = cat_id
+                    coco['categories'].append({
+                        'id': cat_id,
+                        'name': ann.label_name,
+                        'supercategory': '',
+                    })
+                coco['annotations'].append({
+                    'id': ann_id,
+                    'image_id': image.id,
+                    'category_id': category_map[ann.label_id],
+                    'bbox': [ann.x, ann.y, ann.width, ann.height],
+                    'segmentation': ann.points or [],
+                    'area': ann.width * ann.height,
+                    'iscrowd': 0,
+                })
+                ann_id += 1
+
+        response = HttpResponse(
+            json.dumps(coco, ensure_ascii=False, indent=2),
+            content_type='application/json',
+        )
+        response['Content-Disposition'] = f'attachment; filename="task_{task_id}_coco.json"'
+        return response
+
+    def _export_yolo(self, task_id, images):
+        result = {}
+        for image in images:
+            if image.width == 0 or image.height == 0:
+                continue
+            lines = []
+            for ann in image.annotations.all():
+                cx = (ann.x + ann.width / 2) / image.width
+                cy = (ann.y + ann.height / 2) / image.height
+                w = ann.width / image.width
+                h = ann.height / image.height
+                lines.append(f'0 {cx:.6f} {cy:.6f} {w:.6f} {h:.6f}')
+            result[image.original_filename] = '\n'.join(lines)
+
+        response = HttpResponse(
+            json.dumps(result, ensure_ascii=False, indent=2),
+            content_type='application/json',
+        )
+        response['Content-Disposition'] = f'attachment; filename="task_{task_id}_yolo.json"'
+        return response
+
+    def _export_csv(self, task_id, images):
+        buf = StringIO()
+        writer = csv.writer(buf)
+        writer.writerow([
+            'image_id', 'filename', 'label_id', 'label_name', 'label_color',
+            'annotation_type', 'x', 'y', 'width', 'height', 'comment',
+        ])
+        for image in images:
+            for ann in image.annotations.all():
+                writer.writerow([
+                    image.id, image.original_filename,
+                    ann.label_id, ann.label_name, ann.label_color,
+                    ann.annotation_type,
+                    ann.x, ann.y, ann.width, ann.height,
+                    ann.comment,
+                ])
+        response = HttpResponse(buf.getvalue(), content_type='text/csv')
+        response['Content-Disposition'] = f'attachment; filename="task_{task_id}_annotations.csv"'
+        return response
+
+
+# ─── INTERNAL API VIEWS ───────────────────────────────────────────────────────
+
+class InternalTaskStatusView(APIView):
+    """
+    GET /api/annotations/internal/tasks/<task_id>/status/
+    Header: X-Internal-Service: true
+
+    task-service hỏi: tỷ lệ ảnh đã confirm của task là bao nhiêu?
+    """
+    permission_classes = [IsInternalService]
+
+    def get(self, request, task_id):
+        total = ImageFile.objects.filter(task_id=task_id).count()
+        if total == 0:
+            return success_response({'task_id': task_id, 'total': 0, 'confirmed': 0, 'percent': 0})
+
+        confirmed = ImageFile.objects.filter(task_id=task_id, is_confirmed=True).count()
+        percent = round(confirmed / total * 100, 1)
+
+        return success_response({
+            'task_id': task_id,
+            'total': total,
+            'confirmed': confirmed,
+            'percent': percent,
+            'is_done': confirmed == total,
+        })
+
+
+class InternalTaskExportView(APIView):
+    """
+    GET /api/annotations/internal/tasks/<task_id>/export/
+    Header: X-Internal-Service: true
+
+    task-service lấy raw annotation data khi đóng gói task completed.
+    """
+    permission_classes = [IsInternalService]
+
+    def get(self, request, task_id):
+        images = ImageFile.objects.filter(task_id=task_id).prefetch_related('annotations').order_by('index')
+
+        result = []
+        for image in images:
+            result.append({
+                'image_id': image.id,
+                'index': image.index,
+                'filename': image.original_filename,
+                'width': image.width,
+                'height': image.height,
+                'is_confirmed': image.is_confirmed,
+                'annotations': AnnotationSerializer(
+                    image.annotations.all(), many=True
+                ).data,
+            })
+
+        return success_response({'task_id': task_id, 'images': result})

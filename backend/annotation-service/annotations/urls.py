@@ -15,4 +15,11 @@ urlpatterns = [
     # ── Bulk save + Task workflow ─────────────────────────────────────────────
     path('images/<int:pk>/annotations/bulk-save/', views.BulkAnnotationSaveView.as_view()),
     path('tasks/<int:task_id>/images/', views.TaskImagesWithAnnotationsView.as_view()),
+
+    # ── Export ────────────────────────────────────────────────────────────────
+    path('tasks/<int:task_id>/export/', views.TaskExportView.as_view()),
+
+    # ── Internal APIs (header: X-Internal-Service: true) ──────────────────────
+    path('internal/tasks/<int:task_id>/status/', views.InternalTaskStatusView.as_view()),
+    path('internal/tasks/<int:task_id>/export/', views.InternalTaskExportView.as_view()),
 ]
