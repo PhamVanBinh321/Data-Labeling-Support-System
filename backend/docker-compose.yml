@@ -102,6 +102,8 @@ services:
       context: ./task-service
       dockerfile: Dockerfile
     container_name: dlss_task
+    ports:
+      - "8003:8003"
     env_file: ./task-service/.env
     environment:
       - DATABASE_URL=postgresql://task_user:task_pass@task-db:5432/task_db
