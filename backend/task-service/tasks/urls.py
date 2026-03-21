@@ -9,4 +9,9 @@ urlpatterns = [
     # ── State machine + History ───────────────────────────────────────────────
     path('<int:pk>/status/', views.TaskStatusView.as_view()),
     path('<int:pk>/history/', views.TaskHistoryView.as_view()),
+
+    # ── Dashboards ────────────────────────────────────────────────────────────
+    path('dashboard/manager/', views.ManagerDashboardView.as_view()),
+    path('dashboard/annotator/', views.AnnotatorDashboardView.as_view()),
+    path('dashboard/reviewer/', views.ReviewerDashboardView.as_view()),
 ]

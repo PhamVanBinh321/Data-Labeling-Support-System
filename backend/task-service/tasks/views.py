@@ -218,3 +218,100 @@ class TaskHistoryView(APIView):
 
         history = task.history.all()
         return success_response(TaskStatusHistorySerializer(history, many=True).data)
+
+
+# ─── DASHBOARD VIEWS ──────────────────────────────────────────────────────────
+
+class ManagerDashboardView(APIView):
+    """
+    GET /api/tasks/dashboard/manager/?project_id=<id>
+    Thống kê tổng hợp cho Manager.
+    """
+    permission_classes = [IsAuthenticated, IsManager]
+
+    def get(self, request):
+        qs = Task.objects.all()
+
+        project_id = request.query_params.get('project_id')
+        if project_id:
+            qs = qs.filter(project_id=project_id)
+
+        today = date.today()
+
+        total = qs.count()
+        status_counts = {}
+        for choice in Task.Status.values:
+            status_counts[choice.replace('-', '_')] = qs.filter(status=choice).count()
+
+        by_priority = {}
+        for p in Task.Priority.values:
+            by_priority[p] = qs.filter(priority=p).count()
+
+        overdue = qs.exclude(
+            status__in=[Task.Status.COMPLETED, Task.Status.APPROVED]
+        ).filter(deadline__lt=today).count()
+
+        return success_response({
+            'total': total,
+            **status_counts,
+            'by_priority': by_priority,
+            'overdue': overdue,
+        })
+
+
+class AnnotatorDashboardView(APIView):
+    """
+    GET /api/tasks/dashboard/annotator/
+    Danh sách tasks của annotator, tóm tắt theo status.
+    """
+    permission_classes = [IsAuthenticated, IsAnnotator]
+
+    def get(self, request):
+        uid = request.user.id
+        qs = Task.objects.filter(annotator_id=uid)
+        today = date.today()
+
+        tasks = TaskListSerializer(qs.order_by('deadline'), many=True).data
+
+        summary = {}
+        for choice in Task.Status.values:
+            summary[choice.replace('-', '_')] = qs.filter(status=choice).count()
+
+        overdue = qs.exclude(
+            status__in=[Task.Status.COMPLETED, Task.Status.APPROVED]
+        ).filter(deadline__lt=today).count()
+
+        return success_response({
+            'summary': {**summary, 'overdue': overdue},
+            'tasks': tasks,
+        })
+
+
+class ReviewerDashboardView(APIView):
+    """
+    GET /api/tasks/dashboard/reviewer/
+    Tasks đang in-review giao cho reviewer, sort by deadline.
+    """
+    permission_classes = [IsAuthenticated, IsReviewer]
+
+    def get(self, request):
+        uid = request.user.id
+        qs = Task.objects.filter(reviewer_id=uid)
+        today = date.today()
+
+        pending_review = qs.filter(status=Task.Status.IN_REVIEW).order_by('deadline')
+        all_tasks = qs.order_by('deadline')
+
+        summary = {}
+        for choice in Task.Status.values:
+            summary[choice.replace('-', '_')] = qs.filter(status=choice).count()
+
+        overdue = qs.exclude(
+            status__in=[Task.Status.COMPLETED, Task.Status.APPROVED]
+        ).filter(deadline__lt=today).count()
+
+        return success_response({
+            'summary': {**summary, 'overdue': overdue},
+            'pending_review': TaskListSerializer(pending_review, many=True).data,
+            'all_tasks': TaskListSerializer(all_tasks, many=True).data,
+        })
