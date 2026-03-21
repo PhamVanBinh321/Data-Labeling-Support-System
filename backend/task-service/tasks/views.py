@@ -142,3 +142,79 @@ class TaskDetailView(APIView):
 
         task.delete()
         return success_response(message='Đã xóa task.')
+
+
+# ─── STATE MACHINE + HISTORY ──────────────────────────────────────────────────
+
+class TaskStatusView(APIView):
+    """
+    PATCH /api/tasks/<pk>/status/
+    Đổi trạng thái task theo state machine. Role-based.
+    """
+    permission_classes = [IsAuthenticated, IsAnyRole]
+
+    def patch(self, request, pk):
+        try:
+            task = Task.objects.get(pk=pk)
+        except Task.DoesNotExist:
+            return error_response('Không tìm thấy task.', status=404)
+
+        serializer = TaskStatusSerializer(
+            data=request.data,
+            context={'task': task, 'user': request.user},
+        )
+        if not serializer.is_valid():
+            return error_response('Dữ liệu không hợp lệ.', errors=serializer.errors)
+
+        new_status = serializer.validated_data['status']
+        reject_reason = serializer.validated_data.get('reject_reason', '')
+        old_status = task.status
+
+        with transaction.atomic():
+            task.status = new_status
+
+            if new_status == Task.Status.REJECTED:
+                task.reject_reason = reject_reason
+
+            if new_status == Task.Status.IN_REVIEW:
+                task.submitted_at = datetime.now(tz=timezone.utc)
+
+            task.save()
+
+            TaskStatusHistory.objects.create(
+                task=task,
+                from_status=old_status,
+                to_status=new_status,
+                changed_by=request.user.id,
+                reject_reason=reject_reason,
+            )
+
+        return success_response(
+            TaskDetailSerializer(task).data,
+            message=f'Task đã chuyển sang trạng thái "{new_status}".',
+        )
+
+
+class TaskHistoryView(APIView):
+    """
+    GET /api/tasks/<pk>/history/
+    Xem audit log lịch sử thay đổi trạng thái.
+    """
+    permission_classes = [IsAuthenticated, IsAnyRole]
+
+    def get(self, request, pk):
+        try:
+            task = Task.objects.get(pk=pk)
+        except Task.DoesNotExist:
+            return error_response('Không tìm thấy task.', status=404)
+
+        # Kiểm tra quyền truy cập
+        role = request.user.role
+        uid = request.user.id
+        if role == 'annotator' and task.annotator_id != uid:
+            return error_response('Bạn không có quyền xem task này.', status=403)
+        if role == 'reviewer' and task.reviewer_id != uid:
+            return error_response('Bạn không có quyền xem task này.', status=403)
+
+        history = task.history.all()
+        return success_response(TaskStatusHistorySerializer(history, many=True).data)
