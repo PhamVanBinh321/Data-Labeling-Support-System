@@ -315,3 +315,81 @@ class ReviewerDashboardView(APIView):
             'pending_review': TaskListSerializer(pending_review, many=True).data,
             'all_tasks': TaskListSerializer(all_tasks, many=True).data,
         })
+
+
+# ─── INTERNAL APIs ────────────────────────────────────────────────────────────
+
+class InternalCountersView(APIView):
+    """
+    PATCH /api/tasks/internal/tasks/<pk>/counters/
+    Header: X-Internal-Service: true
+
+    annotation-service cập nhật tổng số ảnh và số ảnh đã confirm.
+    Body: { "total_images": 10, "completed_images": 7 }
+    """
+    permission_classes = [IsInternalService]
+
+    def patch(self, request, pk):
+        try:
+            task = Task.objects.get(pk=pk)
+        except Task.DoesNotExist:
+            return error_response('Không tìm thấy task.', status=404)
+
+        total = request.data.get('total_images')
+        completed = request.data.get('completed_images')
+
+        update_fields = []
+        if total is not None:
+            task.total_images = int(total)
+            update_fields.append('total_images')
+        if completed is not None:
+            task.completed_images = int(completed)
+            update_fields.append('completed_images')
+
+        if update_fields:
+            task.save(update_fields=update_fields)
+
+        return success_response({
+            'task_id': task.id,
+            'total_images': task.total_images,
+            'completed_images': task.completed_images,
+        }, message='Cập nhật counters thành công.')
+
+
+class InternalProjectTasksView(APIView):
+    """
+    GET /api/tasks/internal/projects/<project_id>/tasks/
+    Header: X-Internal-Service: true
+
+    project-service lấy danh sách tasks của project.
+    """
+    permission_classes = [IsInternalService]
+
+    def get(self, request, project_id):
+        tasks = Task.objects.filter(project_id=project_id).order_by('-created_at')
+        return success_response(TaskListSerializer(tasks, many=True).data)
+
+
+class InternalTaskDetailView(APIView):
+    """
+    GET /api/tasks/internal/tasks/<pk>/
+    Header: X-Internal-Service: true
+
+    annotation-service lấy thông tin task (project_id, annotator_id, ...).
+    """
+    permission_classes = [IsInternalService]
+
+    def get(self, request, pk):
+        try:
+            task = Task.objects.get(pk=pk)
+        except Task.DoesNotExist:
+            return error_response('Không tìm thấy task.', status=404)
+
+        return success_response({
+            'id': task.id,
+            'project_id': task.project_id,
+            'annotator_id': task.annotator_id,
+            'reviewer_id': task.reviewer_id,
+            'status': task.status,
+            'name': task.name,
+        })

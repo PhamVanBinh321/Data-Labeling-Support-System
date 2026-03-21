@@ -14,4 +14,9 @@ urlpatterns = [
     path('dashboard/manager/', views.ManagerDashboardView.as_view()),
     path('dashboard/annotator/', views.AnnotatorDashboardView.as_view()),
     path('dashboard/reviewer/', views.ReviewerDashboardView.as_view()),
+
+    # ── Internal APIs (header: X-Internal-Service: true) ─────────────────────
+    path('internal/tasks/<int:pk>/counters/', views.InternalCountersView.as_view()),
+    path('internal/projects/<int:project_id>/tasks/', views.InternalProjectTasksView.as_view()),
+    path('internal/tasks/<int:pk>/', views.InternalTaskDetailView.as_view()),
 ]
