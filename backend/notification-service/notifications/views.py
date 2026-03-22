@@ -121,3 +121,57 @@ class NotificationDeleteView(APIView):
 
         notif.delete()
         return success_response(message='Đã xóa notification.')
+
+
+# ─── INTERNAL API VIEWS ───────────────────────────────────────────────────────
+
+class InternalCreateNotificationView(APIView):
+    """
+    POST /api/notify/internal/
+    Header: X-Internal-Service: true
+
+    task-service / project-service gọi để tạo 1 notification.
+    Body: { recipient_id, type, title, message, task_id?, project_id? }
+    """
+    permission_classes = [IsInternalService]
+
+    def post(self, request):
+        serializer = CreateNotificationSerializer(data=request.data)
+        if not serializer.is_valid():
+            return error_response('Dữ liệu không hợp lệ.', errors=serializer.errors)
+
+        notif = Notification.objects.create(**serializer.validated_data)
+        return success_response(
+            NotificationSerializer(notif).data,
+            message='Tạo notification thành công.',
+            status=201,
+        )
+
+
+class InternalBulkCreateNotificationView(APIView):
+    """
+    POST /api/notify/internal/bulk/
+    Header: X-Internal-Service: true
+
+    Tạo nhiều notifications cùng lúc (atomic).
+    Body: { "notifications": [ { recipient_id, type, title, message, ... }, ... ] }
+    """
+    permission_classes = [IsInternalService]
+
+    def post(self, request):
+        serializer = BulkCreateNotificationSerializer(data=request.data)
+        if not serializer.is_valid():
+            return error_response('Dữ liệu không hợp lệ.', errors=serializer.errors)
+
+        items = serializer.validated_data['notifications']
+
+        with transaction.atomic():
+            new_notifs = Notification.objects.bulk_create([
+                Notification(**item) for item in items
+            ])
+
+        return success_response(
+            NotificationSerializer(new_notifs, many=True).data,
+            message=f'Đã tạo {len(new_notifs)} notification.',
+            status=201,
+        )

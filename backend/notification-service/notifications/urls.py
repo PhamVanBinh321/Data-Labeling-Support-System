@@ -8,4 +8,8 @@ urlpatterns = [
     path('read-all/', views.NotificationReadAllView.as_view()),
     path('<int:pk>/read/', views.NotificationMarkReadView.as_view()),
     path('<int:pk>/', views.NotificationDeleteView.as_view()),
+
+    # ── Internal APIs (header: X-Internal-Service: true, không cần JWT) ───────
+    path('internal/', views.InternalCreateNotificationView.as_view()),
+    path('internal/bulk/', views.InternalBulkCreateNotificationView.as_view()),
 ]
