@@ -183,6 +183,8 @@ services:
       context: ./notification-service
       dockerfile: Dockerfile
     container_name: dlss_notification
+    ports:
+      - "8005:8005"
     env_file: ./notification-service/.env
     environment:
       - DATABASE_URL=postgresql://notify_user:notify_pass@notification-db:5432/notify_db
