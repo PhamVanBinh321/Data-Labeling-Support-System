@@ -52,7 +52,7 @@ NOTIFICATION_SERVICE_URL = config('NOTIFICATION_SERVICE_URL', default='http://no
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'tasks.backends.ServiceJWTAuthentication',
     ),
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated',
@@ -70,6 +70,10 @@ SPECTACULAR_SETTINGS = {
 
 SIMPLE_JWT = {
     'AUTH_HEADER_TYPES': ('Bearer',),
+    # JWT phải được verify bằng cùng key mà auth-service đã ký.
+    # Đặt JWT_SIGNING_KEY trong .env — giống với auth-service.
+    'SIGNING_KEY': config('JWT_SIGNING_KEY', default=SECRET_KEY),
+    'VERIFYING_KEY': config('JWT_SIGNING_KEY', default=SECRET_KEY),
 }
 
 CORS_ALLOWED_ORIGINS = [
