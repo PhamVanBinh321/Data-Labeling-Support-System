@@ -23,9 +23,13 @@ const RoleSelectionPage: React.FC = () => {
     setShowModal(true);
   };
 
-  const confirmRoleSelection = () => {
+  const confirmRoleSelection = async () => {
     if (selectedRole) {
-      setRole(selectedRole);
+      try {
+        await setRole(selectedRole);
+      } catch {
+        // Role đã được set hoặc lỗi — vẫn navigate theo role đã chọn
+      }
       navigate(`/${selectedRole}`);
     }
   };

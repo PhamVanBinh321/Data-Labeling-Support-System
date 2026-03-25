@@ -2,25 +2,30 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Mail, Lock, Github } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import toast from 'react-hot-toast';
 
 const LoginPage: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [submitting, setSubmitting] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Handle login logic here
-    console.log('Login attempt with:', email);
-    login(); // Mock login 
-    
-    // Check if user already has a role tied to their account permanently
-    const savedRole = localStorage.getItem('annotate_pro_role');
-    if (savedRole) {
-      navigate(`/${savedRole}`);
-    } else {
-      navigate('/role-selection');
+    setSubmitting(true);
+    try {
+      await login(email, password);
+      const savedRole = localStorage.getItem('annotate_pro_role');
+      if (savedRole) {
+        navigate(`/${savedRole}`);
+      } else {
+        navigate('/role-selection');
+      }
+    } catch {
+      toast.error('Email hoặc mật khẩu không đúng.');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -69,8 +74,8 @@ const LoginPage: React.FC = () => {
           </div>
         </div>
 
-        <button type="submit" className="btn btn-primary auth-btn">
-          Đăng nhập
+        <button type="submit" className="btn btn-primary auth-btn" disabled={submitting}>
+          {submitting ? 'Đang đăng nhập...' : 'Đăng nhập'}
         </button>
       </form>
 
