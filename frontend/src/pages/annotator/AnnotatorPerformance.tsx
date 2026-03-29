@@ -3,18 +3,22 @@ import {
   BarChart2, CheckCircle, XCircle, Clock, Star,
   TrendingUp, Award, Tag, Image
 } from 'lucide-react';
-import { MOCK_TASKS, MOCK_PROJECTS, MOCK_USERS } from '../../data/mockData';
 import type { Task } from '../../data/mockData';
 import DataTable from '../../components/common/DataTable';
 import StatusBadge from '../../components/common/StatusBadge';
 import type { StatusType } from '../../components/common/StatusBadge';
 import './AnnotatorPerformance.css';
-
-// ── Current annotator ──
-const ME = MOCK_USERS.find(u => u.id === 'usr-002')!;
+import { useData } from '../../context/DataContext';
+import { useAuth } from '../../context/AuthContext';
 
 const AnnotatorPerformance: React.FC = () => {
-  const myTasks = useMemo(() => MOCK_TASKS.filter(t => t.annotatorId === ME.id), []);
+  const { user } = useAuth();
+  const { tasks, getProjectById } = useData();
+
+  const myTasks = useMemo(
+    () => tasks.filter(t => t.annotatorId === String(user?.id ?? '')),
+    [tasks, user]
+  );
 
   // ── Aggregate stats ──
   const stats = useMemo(() => {
@@ -31,21 +35,21 @@ const AnnotatorPerformance: React.FC = () => {
       totalImagesLabeled: totalDone,
       totalImages: totalImg,
       overallPct: totalImg > 0 ? Math.round((totalDone / totalImg) * 100) : 0,
-      qualityScore: ME.qualityScore ?? 0,
-      tasksCompleted: ME.tasksCompleted ?? done.length,
+      qualityScore: (user as any)?.quality_score ?? 0,
+      tasksCompleted: done.length,
     };
-  }, [myTasks]);
+  }, [myTasks, user]);
 
-  // ── Label frequency (from task types via projects) ──
+  // ── Label frequency ──
   const topTypes = useMemo(() => {
     const map: Record<string, number> = {};
     myTasks.forEach(t => {
-      const proj = MOCK_PROJECTS.find(p => p.id === t.projectId);
+      const proj = getProjectById(t.projectId);
       const type = proj?.typeName ?? 'Unknown';
       map[type] = (map[type] ?? 0) + t.completedImages;
     });
     return Object.entries(map).sort((a, b) => b[1] - a[1]);
-  }, [myTasks]);
+  }, [myTasks, getProjectById]);
 
   const maxTypeCount = topTypes[0]?.[1] ?? 1;
 
@@ -54,7 +58,7 @@ const AnnotatorPerformance: React.FC = () => {
     {
       key: 'name', title: 'Task',
       render: (t: Task) => {
-        const proj = MOCK_PROJECTS.find(p => p.id === t.projectId);
+        const proj = getProjectById(t.projectId);
         return (
           <div className="perf-name-cell">
             <strong>{t.name}</strong>
@@ -79,7 +83,7 @@ const AnnotatorPerformance: React.FC = () => {
     {
       key: 'type', title: 'Loại',
       render: (t: Task) => {
-        const proj = MOCK_PROJECTS.find(p => p.id === t.projectId);
+        const proj = getProjectById(t.projectId);
         return <span className="perf-type">{proj?.typeName ?? '—'}</span>;
       }
     },
@@ -95,11 +99,11 @@ const AnnotatorPerformance: React.FC = () => {
       {/* Header */}
       <div className="perf-header">
         <div className="perf-avatar" style={{ background: 'linear-gradient(135deg,#6366f1,#8b5cf6)' }}>
-          {ME.avatar}
+          👤
         </div>
         <div>
           <h1><BarChart2 size={22} /> Hiệu suất của tôi</h1>
-          <p className="page-subtitle">{ME.name} · {ME.email}</p>
+          <p className="page-subtitle">{user?.name ?? 'Annotator'} · {user?.email ?? ''}</p>
         </div>
       </div>
 

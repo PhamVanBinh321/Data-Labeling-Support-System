@@ -19,6 +19,10 @@ urlpatterns = [
     # ── Export ────────────────────────────────────────────────────────────────
     path('tasks/<int:task_id>/export/', views.TaskExportView.as_view()),
 
+    # ── Project image pool ────────────────────────────────────────────────────
+    path('projects/<int:project_id>/images/', views.ProjectImagePoolView.as_view()),
+    path('projects/<int:project_id>/assign/', views.ProjectAssignImagesView.as_view()),
+
     # ── Internal APIs (header: X-Internal-Service: true) ──────────────────────
     path('internal/tasks/<int:task_id>/status/', views.InternalTaskStatusView.as_view()),
     path('internal/tasks/<int:task_id>/export/', views.InternalTaskExportView.as_view()),

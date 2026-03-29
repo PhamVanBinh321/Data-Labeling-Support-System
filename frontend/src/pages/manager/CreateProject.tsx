@@ -4,6 +4,8 @@ import { ArrowLeft, ArrowRight, Check, Plus, Trash2 } from 'lucide-react';
 import type { LabelDefinition, ProjectType } from '../../data/mockData';
 import './CreateProject.css';
 import toast from 'react-hot-toast';
+import { projectsApi } from '../../api/projects';
+import { useData } from '../../context/DataContext';
 
 // Step markers
 const STEPS = ['Thông tin cơ bản', 'Ontology & Nhãn', 'Hướng dẫn'];
@@ -30,7 +32,9 @@ const DEFAULT_LABEL: Omit<LabelDefinition, 'id'> = { name: '', color: '#3b82f6' 
 
 const CreateProject: React.FC = () => {
   const navigate = useNavigate();
+  const { refreshProjects } = useData();
   const [step, setStep] = useState(0);
+  const [submitting, setSubmitting] = useState(false);
   const [form, setForm] = useState<FormData>({
     name: '',
     type: 'bounding_box',
@@ -60,10 +64,27 @@ const CreateProject: React.FC = () => {
     }));
   };
 
-  const handleSubmit = () => {
-    console.log('Creating project:', form);
-    toast.success('🚀 Dự án đã được tạo thành công!');
-    setTimeout(() => navigate('/manager/projects'), 1200);
+  const handleSubmit = async () => {
+    setSubmitting(true);
+    try {
+      const project = await projectsApi.create({
+        name: form.name,
+        type: form.type,
+        description: form.description,
+        guidelines: form.guidelines,
+      });
+      // Tạo labels
+      for (const label of form.labels) {
+        await projectsApi.createLabel(project.id, { name: label.name, color: label.color });
+      }
+      await refreshProjects();
+      toast.success('Dự án đã được tạo thành công!');
+      navigate('/manager/projects');
+    } catch {
+      toast.error('Tạo dự án thất bại, thử lại.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -246,8 +267,8 @@ const CreateProject: React.FC = () => {
             Tiếp tục <ArrowRight size={18} />
           </button>
         ) : (
-          <button className="btn btn-primary btn-icon-text" onClick={handleSubmit}>
-            <Check size={18} /> Tạo dự án
+          <button className="btn btn-primary btn-icon-text" onClick={handleSubmit} disabled={submitting}>
+            <Check size={18} /> {submitting ? 'Đang tạo...' : 'Tạo dự án'}
           </button>
         )}
       </div>

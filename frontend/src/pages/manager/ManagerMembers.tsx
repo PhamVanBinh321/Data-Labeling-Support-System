@@ -3,8 +3,9 @@ import {
   Users, Search, Mail, Star, CheckSquare,
   Shield, Eye
 } from 'lucide-react';
-import { MOCK_USERS, MOCK_TASKS, MOCK_PROJECT_MEMBERS, MOCK_PROJECTS } from '../../data/mockData';
+import { MOCK_USERS, MOCK_PROJECT_MEMBERS } from '../../data/mockData';
 import type { User, UserRole } from '../../data/mockData';
+import { useData } from '../../context/DataContext';
 import './ManagerMembers.css';
 
 const ROLE_CONFIG: Record<UserRole, { label: string; color: string; bg: string }> = {
@@ -20,6 +21,7 @@ const AVATAR_GRADIENT: Record<UserRole, string> = {
 };
 
 const ManagerMembers: React.FC = () => {
+  const { tasks, getProjectById } = useData();
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState<UserRole | 'all'>('all');
 
@@ -33,9 +35,9 @@ const ManagerMembers: React.FC = () => {
 
   // Per-user enrichment
   const enrichUser = (u: User) => {
-    const memberships = MOCK_PROJECT_MEMBERS.filter(m => m.userId === u.id && m.status === 'active');
-    const activeProjects = MOCK_PROJECTS.filter(p => memberships.some(m => m.projectId === p.id));
-    const tasksTotal = MOCK_TASKS.filter(t => t.annotatorId === u.id || t.reviewerId === u.id).length;
+    const memberships    = MOCK_PROJECT_MEMBERS.filter(m => m.userId === u.id && m.status === 'active');
+    const activeProjects = memberships.map(m => getProjectById(m.projectId)).filter(Boolean);
+    const tasksTotal     = tasks.filter(t => t.annotatorId === u.id || t.reviewerId === u.id).length;
     return { memberships, activeProjects, tasksTotal };
   };
 

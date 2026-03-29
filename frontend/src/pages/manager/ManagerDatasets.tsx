@@ -5,8 +5,9 @@ import {
   CheckCircle, Clock, AlertTriangle,
   ExternalLink
 } from 'lucide-react';
-import { MOCK_DATASETS, MOCK_PROJECTS } from '../../data/mockData';
+import { MOCK_DATASETS } from '../../data/mockData';
 import type { Dataset, DatasetType, DatasetStatus } from '../../data/mockData';
+import { useData } from '../../context/DataContext';
 import DataTable from '../../components/common/DataTable';
 import './ManagerDatasets.css';
 
@@ -30,6 +31,7 @@ const SOURCE_LABEL: Record<string, string> = {
 };
 
 const ManagerDatasets: React.FC = () => {
+  const { getProjectById } = useData();
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<DatasetType | 'all'>('all');
 
@@ -64,7 +66,7 @@ const ManagerDatasets: React.FC = () => {
       key: 'project',
       title: 'Dự án',
       render: (d: Dataset) => {
-        const proj = MOCK_PROJECTS.find(p => p.id === d.projectId);
+        const proj = getProjectById(d.projectId);
         return proj
           ? <Link to={`/manager/projects/${proj.id}`} className="ds-proj-link">{proj.name} <ExternalLink size={12} /></Link>
           : '—';

@@ -90,6 +90,22 @@ export const annotationsApi = {
     return res.data.data;
   },
 
+  // Project image pool
+  listProjectImages: async (project_id: number, unassigned = false) => {
+    const res = await client.get(`/api/annotations/projects/${project_id}/images/`, {
+      params: unassigned ? { unassigned: 'true' } : {},
+    });
+    return res.data.data;
+  },
+
+  assignImagesToTask: async (project_id: number, task_id: number, count: number) => {
+    const res = await client.post(`/api/annotations/projects/${project_id}/assign/`, {
+      task_id,
+      count,
+    });
+    return res.data.data;
+  },
+
   // Export
   exportTask: async (task_id: number, format: 'coco' | 'yolo' | 'csv') => {
     const res = await client.get(`/api/annotations/tasks/${task_id}/export/`, {

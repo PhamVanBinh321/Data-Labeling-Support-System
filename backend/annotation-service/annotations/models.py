@@ -7,11 +7,11 @@ class ImageFile(models.Model):
     task_id và project_id tham chiếu cross-service.
     """
 
-    task_id = models.IntegerField(db_index=True)
+    task_id = models.IntegerField(db_index=True, null=True, blank=True)  # null = chưa assign vào task
     project_id = models.IntegerField(db_index=True)
     dataset_id = models.IntegerField(null=True, blank=True, db_index=True)
 
-    index = models.IntegerField()  # Thứ tự ảnh trong task, 0-based
+    index = models.IntegerField()  # Thứ tự ảnh trong task (hoặc project nếu task_id null), 0-based
     file_path = models.CharField(max_length=500)  # Relative path dưới MEDIA_ROOT
     original_filename = models.CharField(max_length=255, blank=True, default='')
 
@@ -24,15 +24,16 @@ class ImageFile(models.Model):
 
     class Meta:
         db_table = 'image_files'
-        unique_together = ('task_id', 'index')
-        ordering = ['task_id', 'index']
+        ordering = ['project_id', 'task_id', 'index']
 
     @property
     def url(self):
         return f'/media/{self.file_path}'
 
     def __str__(self):
-        return f'Task {self.task_id} / Image #{self.index}'
+        if self.task_id:
+            return f'Task {self.task_id} / Image #{self.index}'
+        return f'Project {self.project_id} / Unassigned Image #{self.index}'
 
 
 class Annotation(models.Model):

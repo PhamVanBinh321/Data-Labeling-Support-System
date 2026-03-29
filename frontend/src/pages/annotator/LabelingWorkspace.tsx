@@ -10,6 +10,7 @@ import {
 import type { LabelDefinition } from '../../data/mockData';
 import toast from 'react-hot-toast';
 import { useData } from '../../context/DataContext';
+import { annotationsApi } from '../../api/annotations';
 import TaskReviewModal from '../../components/reviewer/TaskReviewModal';
 import './LabelingWorkspace.css';
 
@@ -56,11 +57,22 @@ const LabelingWorkspace: React.FC = () => {
   const [searchParams] = useSearchParams();
   const isReviewer = searchParams.get('mode') === 'reviewer';
 
-  const { tasks, getProjectById } = useData();
+  const { tasks, getProjectById, updateTaskStatus } = useData();
   const task = tasks.find(t => t.id === taskId) ?? tasks[0];
   const project = getProjectById(task.projectId);
   const labels: LabelDefinition[] = project?.labels ?? [];
-  const totalImages = Math.min(task.totalImages, SAMPLE_IMAGES.length);
+
+  // ── API images state ──
+  const [apiImages, setApiImages] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!taskId) return;
+    annotationsApi.listImages(Number(taskId))
+      .then((imgs: any[]) => { if (imgs?.length > 0) setApiImages(imgs); })
+      .catch(() => { /* fallback to mock */ });
+  }, [taskId]);
+
+  const totalImages = apiImages.length > 0 ? apiImages.length : Math.min(task.totalImages, SAMPLE_IMAGES.length);
   const rejectInfo = task.rejectReason ? { reviewer: 'Reviewer', comment: task.rejectReason } : undefined;
 
   // ── Core state ──
@@ -95,10 +107,24 @@ const LabelingWorkspace: React.FC = () => {
     return () => ro.disconnect();
   }, []);
 
-  // ── Save to localStorage ──
+  // ── Save to localStorage + API (fire-and-forget) ──
   const saveToLS = useCallback((anns: EnrichedAnnotation[], idx: number) => {
     localStorage.setItem(LS_ANN_KEY(task.id, idx), JSON.stringify(anns));
-  }, [task.id]);
+    const imageId = apiImages[idx]?.id;
+    if (imageId) {
+      annotationsApi.bulkSave(imageId, anns.map(ann => ({
+        label_id: ann.labelId,
+        label_name: ann.labelName,
+        label_color: ann.labelColor,
+        annotation_type: 'bounding_box',
+        x: ann.mark.x,
+        y: ann.mark.y,
+        width: ann.mark.width,
+        height: ann.mark.height,
+        comment: ann.comment,
+      }))).catch(() => { /* silent — localStorage is source of truth */ });
+    }
+  }, [task.id, apiImages]);
 
   // ── Navigate images — SYNCHRONOUSLY load new annotations ──
   const goToImage = useCallback((nextIdx: number) => {
@@ -170,6 +196,10 @@ const LabelingWorkspace: React.FC = () => {
   const handleConfirmImage = () => {
     localStorage.setItem(LS_CONFIRM_KEY(task.id, imageIdx), 'true');
     setConfirmed(true);
+    const imageId = apiImages[imageIdx]?.id;
+    if (imageId) {
+      annotationsApi.confirmImage(imageId).catch(() => { /* silent */ });
+    }
     toast.success(`✅ Đã xác nhận ảnh ${imageIdx + 1}/${totalImages}`);
     // Auto-advance to next if not last
     if (imageIdx < totalImages - 1) {
@@ -178,7 +208,7 @@ const LabelingWorkspace: React.FC = () => {
   };
 
   // ── Submit whole task ──
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (isReviewer) {
       setShowReviewModal(true);
       return;
@@ -193,6 +223,9 @@ const LabelingWorkspace: React.FC = () => {
         duration: 4000,
       });
     }
+    try {
+      await updateTaskStatus(task.id, 'in-review');
+    } catch { /* optimistic update already applied in DataContext */ }
     toast.success('✅ Đã nộp thành công! Task chuyển sang trạng thái In-Review.');
     setTimeout(() => navigate('/annotator/tasks'), 1500);
   };
@@ -296,7 +329,7 @@ const LabelingWorkspace: React.FC = () => {
           <div style={{ width: effectiveWidth, height: effectiveHeight, minWidth: '100%', minHeight: '100%' }}>
             <ReactPictureAnnotation
               key={`${task.id}_${imageIdx}_${zoom}`}
-              image={SAMPLE_IMAGES[imageIdx % SAMPLE_IMAGES.length]}
+              image={apiImages[imageIdx]?.file_url || SAMPLE_IMAGES[imageIdx % SAMPLE_IMAGES.length]}
               onSelect={setSelectedId as any}
               onChange={handleChange as any}
               width={effectiveWidth}

@@ -1,5 +1,6 @@
 import csv
 import json
+import requests
 from io import StringIO
 
 from django.db import transaction
@@ -18,21 +19,50 @@ from .permissions import IsAnnotatorOrReviewerOrManager, IsAnnotator, IsInternal
 from .utils import success_response, error_response
 
 
+# ─── SERVICE HELPERS ─────────────────────────────────────────────────────────
+
+def _update_task_counter(task_id):
+    """Cập nhật completed_images + total_images vào task-service. Fire-and-forget."""
+    from django.conf import settings
+    try:
+        total = ImageFile.objects.filter(task_id=task_id).count()
+        completed = ImageFile.objects.filter(task_id=task_id, is_confirmed=True).count()
+        requests.patch(
+            f'{settings.TASK_SERVICE_URL}/api/tasks/internal/tasks/{task_id}/counters/',
+            json={
+                'total_images': total,
+                'completed_images': completed,
+            },
+            headers={'X-Internal-Service': 'true'},
+            timeout=2,
+        )
+    except Exception:
+        pass  # Không để lỗi counter sync ảnh hưởng annotation flow
+
+
 # ─── IMAGE VIEWS ──────────────────────────────────────────────────────────────
 
 class ImageListView(APIView):
     """
     GET /api/annotations/images/?task_id=<id>
-    Lấy danh sách ảnh của 1 task.
+    GET /api/annotations/images/?project_id=<id>&unassigned=true  — ảnh chưa assign task
     """
     permission_classes = [IsAuthenticated, IsAnnotatorOrReviewerOrManager]
 
     def get(self, request):
-        task_id = request.query_params.get('task_id')
-        if not task_id:
-            return error_response('Thiếu task_id.', status=400)
+        task_id    = request.query_params.get('task_id')
+        project_id = request.query_params.get('project_id')
+        unassigned = request.query_params.get('unassigned') == 'true'
 
-        images = ImageFile.objects.filter(task_id=task_id).order_by('index')
+        if task_id:
+            images = ImageFile.objects.filter(task_id=task_id).order_by('index')
+        elif project_id and unassigned:
+            images = ImageFile.objects.filter(project_id=project_id, task_id__isnull=True).order_by('index')
+        elif project_id:
+            images = ImageFile.objects.filter(project_id=project_id).order_by('index')
+        else:
+            return error_response('Thiếu task_id hoặc project_id.', status=400)
+
         serializer = ImageFileSerializer(images, many=True)
         return success_response(serializer.data)
 
@@ -40,8 +70,8 @@ class ImageListView(APIView):
 class ImageUploadView(APIView):
     """
     POST /api/annotations/images/upload/
-    Upload 1 ảnh cho task. Gọi nhiều lần để upload nhiều ảnh.
-    Form data: file, task_id, project_id, dataset_id (optional)
+    Upload 1 ảnh. task_id tuỳ chọn — nếu không có thì ảnh vào project pool chưa assign.
+    Form data: file, project_id, task_id (optional), dataset_id (optional)
     """
     permission_classes = [IsAuthenticated, IsAnnotatorOrReviewerOrManager]
     parser_classes = [MultiPartParser, FormParser]
@@ -51,16 +81,24 @@ class ImageUploadView(APIView):
         if not serializer.is_valid():
             return error_response('Dữ liệu không hợp lệ.', errors=serializer.errors)
 
-        task_id = serializer.validated_data['task_id']
+        task_id    = serializer.validated_data.get('task_id')
+        project_id = serializer.validated_data['project_id']
 
-        # Xác định index tiếp theo cho task này
-        last = ImageFile.objects.filter(task_id=task_id).order_by('-index').first()
+        # Xác định index tiếp theo (theo task hoặc project pool)
+        if task_id:
+            last = ImageFile.objects.filter(task_id=task_id).order_by('-index').first()
+        else:
+            last = ImageFile.objects.filter(project_id=project_id, task_id__isnull=True).order_by('-index').first()
         next_index = (last.index + 1) if last else 0
 
         try:
             image = serializer.save_image(index=next_index)
         except Exception as e:
             return error_response(f'Lưu file thất bại: {str(e)}', status=500)
+
+        # Nếu upload vào task, cập nhật counter
+        if task_id:
+            _update_task_counter(task_id)
 
         return success_response(
             ImageFileSerializer(image).data,
@@ -119,6 +157,9 @@ class ImageConfirmView(APIView):
 
         image.is_confirmed = True
         image.save(update_fields=['is_confirmed'])
+
+        # Luồng 4: đồng bộ counter sang task-service
+        _update_task_counter(image.task_id)
 
         return success_response(
             ImageFileSerializer(image).data,
@@ -401,6 +442,82 @@ class TaskExportView(APIView):
         response = HttpResponse(buf.getvalue(), content_type='text/csv')
         response['Content-Disposition'] = f'attachment; filename="task_{task_id}_annotations.csv"'
         return response
+
+
+# ─── PROJECT IMAGE POOL VIEWS ────────────────────────────────────────────────
+
+class ProjectImagePoolView(APIView):
+    """
+    GET  /api/annotations/projects/<project_id>/images/
+         Lấy danh sách ảnh chưa assign task (project pool).
+    """
+    permission_classes = [IsAuthenticated, IsAnnotatorOrReviewerOrManager]
+
+    def get(self, request, project_id):
+        images = ImageFile.objects.filter(
+            project_id=project_id, task_id__isnull=True
+        ).order_by('index')
+        serializer = ImageFileSerializer(images, many=True)
+        return success_response({
+            'project_id': project_id,
+            'unassigned_count': images.count(),
+            'images': serializer.data,
+        })
+
+
+class ProjectAssignImagesView(APIView):
+    """
+    POST /api/annotations/projects/<project_id>/assign/
+    Gán N ảnh đầu tiên chưa assign từ project pool vào task.
+    Body: { task_id: int, count: int }
+
+    Manager gọi sau khi tạo task để pull ảnh từ pool vào task.
+    """
+    permission_classes = [IsAuthenticated, IsAnnotatorOrReviewerOrManager]
+
+    def post(self, request, project_id):
+        task_id = request.data.get('task_id')
+        count   = request.data.get('count')
+
+        if not task_id or not count:
+            return error_response('Thiếu task_id hoặc count.', status=400)
+
+        try:
+            task_id = int(task_id)
+            count   = int(count)
+        except (ValueError, TypeError):
+            return error_response('task_id và count phải là số nguyên.', status=400)
+
+        if count <= 0:
+            return error_response('count phải lớn hơn 0.', status=400)
+
+        # Lấy N ảnh chưa assign theo thứ tự index
+        unassigned = ImageFile.objects.filter(
+            project_id=project_id, task_id__isnull=True
+        ).order_by('index')[:count]
+
+        if not unassigned:
+            return error_response('Không có ảnh nào trong project pool.', status=400)
+
+        # Assign vào task, cập nhật index theo thứ tự trong task
+        task_last = ImageFile.objects.filter(task_id=task_id).order_by('-index').first()
+        start_index = (task_last.index + 1) if task_last else 0
+
+        assigned_ids = []
+        with transaction.atomic():
+            for i, image in enumerate(unassigned):
+                image.task_id = task_id
+                image.index   = start_index + i
+                image.save(update_fields=['task_id', 'index'])
+                assigned_ids.append(image.id)
+
+        _update_task_counter(task_id)
+
+        return success_response({
+            'task_id': task_id,
+            'assigned_count': len(assigned_ids),
+            'image_ids': assigned_ids,
+        }, message=f'Đã gán {len(assigned_ids)} ảnh vào task {task_id}.')
 
 
 # ─── INTERNAL API VIEWS ───────────────────────────────────────────────────────

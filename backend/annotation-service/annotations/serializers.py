@@ -40,11 +40,11 @@ class ImageUploadSerializer(serializers.Serializer):
     """
     Validate file upload.
     Nhận 1 file tại 1 thời điểm — gọi nhiều lần để upload nhiều ảnh.
-    task_id, project_id bắt buộc; dataset_id tuỳ chọn.
+    project_id bắt buộc; task_id tuỳ chọn (null = upload vào project pool chưa assign).
     """
     file = serializers.ImageField()
-    task_id = serializers.IntegerField(min_value=1)
     project_id = serializers.IntegerField(min_value=1)
+    task_id = serializers.IntegerField(min_value=1, required=False, allow_null=True)
     dataset_id = serializers.IntegerField(min_value=1, required=False, allow_null=True)
 
     def validate_file(self, value):
@@ -61,16 +61,18 @@ class ImageUploadSerializer(serializers.Serializer):
     def save_image(self, index: int) -> ImageFile:
         """
         Lưu file vào disk, đọc kích thước ảnh, tạo ImageFile record.
-        Trả về instance ImageFile đã được lưu.
+        Nếu task_id=None → lưu vào project pool (chưa assign task).
         """
         file = self.validated_data['file']
-        task_id = self.validated_data['task_id']
+        task_id = self.validated_data.get('task_id')  # Có thể None
         project_id = self.validated_data['project_id']
         dataset_id = self.validated_data.get('dataset_id')
 
-        # Tạo đường dẫn: tasks/<task_id>/<index>_<filename>
-        ext = os.path.splitext(file.name)[1].lower() or '.jpg'
-        relative_path = f'tasks/{task_id}/{index}_{file.name}'
+        # Tạo đường dẫn: tasks/<task_id>/ hoặc projects/<project_id>/unassigned/
+        if task_id:
+            relative_path = f'tasks/{task_id}/{index}_{file.name}'
+        else:
+            relative_path = f'projects/{project_id}/unassigned/{index}_{file.name}'
         abs_path = os.path.join(settings.MEDIA_ROOT, relative_path)
 
         os.makedirs(os.path.dirname(abs_path), exist_ok=True)

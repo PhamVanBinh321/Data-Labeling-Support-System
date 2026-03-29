@@ -4,9 +4,9 @@ import { Plus, Search, Filter } from 'lucide-react';
 import DataTable from '../../components/common/DataTable';
 import StatusBadge from '../../components/common/StatusBadge';
 import type { StatusType } from '../../components/common/StatusBadge';
-import { MOCK_PROJECTS } from '../../data/mockData';
 import type { Project } from '../../data/mockData';
 import './ManagerProjects.css';
+import { useData } from '../../context/DataContext';
 
 // Map project status string → StatusBadge type
 const statusMap: Record<string, StatusType> = {
@@ -18,9 +18,10 @@ const statusMap: Record<string, StatusType> = {
 
 const ManagerProjects: React.FC = () => {
   const navigate = useNavigate();
+  const { projects } = useData();
   const [search, setSearch] = useState('');
 
-  const filtered = MOCK_PROJECTS.filter(p =>
+  const filtered = projects.filter(p =>
     p.name.toLowerCase().includes(search.toLowerCase())
   );
 
@@ -81,15 +82,15 @@ const ManagerProjects: React.FC = () => {
       <div className="stats-row">
         <div className="stat-card">
           <span className="stat-label">Tổng số dự án</span>
-          <h3 className="stat-value">{MOCK_PROJECTS.length}</h3>
+          <h3 className="stat-value">{projects.length}</h3>
         </div>
         <div className="stat-card">
           <span className="stat-label">Đang hoạt động</span>
-          <h3 className="stat-value text-blue">{MOCK_PROJECTS.filter(p => p.status === 'active').length}</h3>
+          <h3 className="stat-value text-blue">{projects.filter(p => p.status === 'active').length}</h3>
         </div>
         <div className="stat-card">
           <span className="stat-label">Hoàn thành</span>
-          <h3 className="stat-value text-green">{MOCK_PROJECTS.filter(p => p.status === 'completed').length}</h3>
+          <h3 className="stat-value text-green">{projects.filter(p => p.status === 'completed').length}</h3>
         </div>
       </div>
 
