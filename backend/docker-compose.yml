@@ -20,6 +20,27 @@ services:
       retries: 5
     restart: unless-stopped
 
+  # ─── RABBITMQ MESSAGE BROKER ─────────────────────────────────────────────
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: dlss_rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: dlss
+      RABBITMQ_DEFAULT_PASS: dlss_pass
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - dlss_network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+    restart: unless-stopped
+
   # ─── MINIO OBJECT STORAGE ────────────────────────────────────────────────
   minio:
     image: minio/minio:latest
@@ -111,10 +132,13 @@ services:
     environment:
       - DATABASE_URL=postgresql://project_user:project_pass@project-db:5432/project_db
       - AUTH_SERVICE_URL=http://auth-service:8001
+      - RABBITMQ_URL=amqp://dlss:dlss_pass@rabbitmq:5672/
     volumes:
       - ./project-service:/app
     depends_on:
       project-db:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
     networks:
       - dlss_network
@@ -151,10 +175,13 @@ services:
       - DATABASE_URL=postgresql://task_user:task_pass@task-db:5432/task_db
       - AUTH_SERVICE_URL=http://auth-service:8001
       - NOTIFICATION_SERVICE_URL=http://notification-service:8005
+      - RABBITMQ_URL=amqp://dlss:dlss_pass@rabbitmq:5672/
     volumes:
       - ./task-service:/app
     depends_on:
       task-db:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
     networks:
       - dlss_network
@@ -239,12 +266,40 @@ services:
       - DATABASE_URL=postgresql://notify_user:notify_pass@notification-db:5432/notify_db
       - AUTH_SERVICE_URL=http://auth-service:8001
       - REDIS_URL=redis://redis:6379/1
+      - RABBITMQ_URL=amqp://dlss:dlss_pass@rabbitmq:5672/
     volumes:
       - ./notification-service:/app
     depends_on:
       notification-db:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - dlss_network
+    restart: unless-stopped
+
+  notification-consumer:
+    build:
+      context: ./notification-service
+      dockerfile: Dockerfile
+    container_name: dlss_notification_consumer
+    command: python manage.py run_consumer
+    env_file: ./notification-service/.env
+    environment:
+      - DATABASE_URL=postgresql://notify_user:notify_pass@notification-db:5432/notify_db
+      - AUTH_SERVICE_URL=http://auth-service:8001
+      - REDIS_URL=redis://redis:6379/1
+      - RABBITMQ_URL=amqp://dlss:dlss_pass@rabbitmq:5672/
+    volumes:
+      - ./notification-service:/app
+    depends_on:
+      notification-db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
     networks:
       - dlss_network
@@ -277,6 +332,7 @@ volumes:
   notification_db_data:
   minio_data:
   redis_data:
+  rabbitmq_data:
 
 # ─── NETWORKS ───────────────────────────────────────────────────────────────
 networks:

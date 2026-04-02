@@ -43,6 +43,7 @@ DATABASES = {
 # Inter-service URLs
 AUTH_SERVICE_URL = config('AUTH_SERVICE_URL', default='http://auth-service:8001')
 NOTIFICATION_SERVICE_URL = config('NOTIFICATION_SERVICE_URL', default='http://notification-service:8005')
+RABBITMQ_URL = config('RABBITMQ_URL', default='amqp://dlss:dlss_pass@rabbitmq:5672/')
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (

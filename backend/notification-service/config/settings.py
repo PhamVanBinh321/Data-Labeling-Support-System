@@ -64,6 +64,7 @@ DATABASES = {
 }
 
 AUTH_SERVICE_URL = config('AUTH_SERVICE_URL', default='http://auth-service:8001')
+RABBITMQ_URL = config('RABBITMQ_URL', default='amqp://dlss:dlss_pass@rabbitmq:5672/')
 # FIREBASE_CREDENTIALS_PATH = config('FIREBASE_CREDENTIALS_PATH', default='')  # sau này
 
 # ── Redis ─────────────────────────────────────────────────────────────────────

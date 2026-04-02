@@ -15,29 +15,14 @@ from .serializers import (
     DatasetSerializer, DatasetCreateSerializer, DatasetUpdateSerializer,
 )
 from .utils import success_response, error_response
+from .publisher import publish_notification
 
 
 # ─── SERVICE HELPERS ─────────────────────────────────────────────────────────
 
 def _send_notification(recipient_id, notif_type, title, message, task_id, project_id):
-    """Gọi notification-service internal API. Fire-and-forget, không raise exception."""
-    from django.conf import settings
-    try:
-        requests.post(
-            f'{settings.NOTIFICATION_SERVICE_URL}/api/notify/internal/',
-            json={
-                'recipient_id': recipient_id,
-                'type': notif_type,
-                'title': title,
-                'message': message,
-                'task_id': task_id,
-                'project_id': project_id,
-            },
-            headers={'X-Internal-Service': 'true'},
-            timeout=2,
-        )
-    except Exception:
-        pass  # Không để lỗi notify ảnh hưởng project flow
+    """Publish notification event lên RabbitMQ (thay thế HTTP call trực tiếp)."""
+    publish_notification(recipient_id, notif_type, title, message, task_id, project_id)
 
 
 # ─── Projects ─────────────────────────────────────────────────────────────────
