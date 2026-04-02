@@ -4,24 +4,18 @@ import { ReactPictureAnnotation } from 'react-picture-annotation';
 import {
   ArrowLeft, Save, Square, ChevronLeft, ChevronRight,
   Trash2, Tag, BookOpen, ChevronDown, ChevronUp,
-  MessageSquare, Shield, AlertTriangle, ZoomIn, ZoomOut,
+  MessageSquare, Shield, AlertTriangle,
   CheckCircle2
 } from 'lucide-react';
 import type { LabelDefinition } from '../../data/mockData';
 import toast from 'react-hot-toast';
 import { useData } from '../../context/DataContext';
 import { annotationsApi } from '../../api/annotations';
+import { projectsApi } from '../../api/projects';
 import TaskReviewModal from '../../components/reviewer/TaskReviewModal';
 import './LabelingWorkspace.css';
 
-// ── Mock image pool ──
-const SAMPLE_IMAGES = [
-  'https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&q=80&w=1200&h=800',
-  'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?auto=format&fit=crop&q=80&w=1200&h=800',
-  'https://images.unsplash.com/photo-1502877338535-766e1452684a?auto=format&fit=crop&q=80&w=1200&h=800',
-  'https://images.unsplash.com/photo-1580273916550-e323be2ae537?auto=format&fit=crop&q=80&w=1200&h=800',
-  'https://images.unsplash.com/photo-1593941707882-a5bba14938c7?auto=format&fit=crop&q=80&w=1200&h=800',
-];
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 
 
@@ -59,8 +53,27 @@ const LabelingWorkspace: React.FC = () => {
 
   const { tasks, getProjectById, updateTaskStatus } = useData();
   const task = tasks.find(t => t.id === taskId) ?? tasks[0];
-  const project = getProjectById(task.projectId);
-  const labels: LabelDefinition[] = project?.labels ?? [];
+  const projectFromCtx = getProjectById(task?.projectId ?? '');
+
+  // ── Labels — fetch project detail (list API không có labels) ──
+  const [labels, setLabels] = useState<LabelDefinition[]>(projectFromCtx?.labels ?? []);
+  useEffect(() => {
+    if (!task?.projectId) return;
+    projectsApi.get(Number(task.projectId))
+      .then((p: any) => {
+        if (p?.labels?.length > 0) {
+          setLabels(p.labels.map((l: any) => ({ id: String(l.id), name: l.name, color: l.color, attributes: l.attributes ?? [] })));
+        }
+      })
+      .catch(() => {});
+  }, [task?.projectId]);
+
+  // ── Auto-transition pending/rejected → in-progress khi mở workspace ──
+  useEffect(() => {
+    if ((task?.status === 'pending' || task?.status === 'rejected') && !isReviewer) {
+      updateTaskStatus(task.id, 'in-progress').catch(() => {});
+    }
+  }, [task?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── API images state ──
   const [apiImages, setApiImages] = useState<any[]>([]);
@@ -68,48 +81,90 @@ const LabelingWorkspace: React.FC = () => {
   useEffect(() => {
     if (!taskId) return;
     annotationsApi.listImages(Number(taskId))
-      .then((imgs: any[]) => { if (imgs?.length > 0) setApiImages(imgs); })
-      .catch(() => { /* fallback to mock */ });
+      .then((imgs: any[]) => {
+        if (imgs?.length > 0) {
+          setApiImages(imgs);
+          // Sync bất kỳ annotation nào còn trong localStorage lên DB
+          imgs.forEach((img: any, idx: number) => {
+            const cached = loadAnnotations(taskId, idx);
+            if (cached.length > 0 && img.id) {
+              annotationsApi.bulkSave(img.id, cached.map((ann: EnrichedAnnotation) => ({
+                label_id: ann.labelId || 'unlabeled',
+                label_name: ann.labelName || 'unlabeled',
+                label_color: ann.labelColor?.length === 7 ? ann.labelColor : '#cccccc',
+                annotation_type: 'bounding_box',
+                x: ann.mark.x,
+                y: ann.mark.y,
+                width: ann.mark.width,
+                height: ann.mark.height,
+                comment: ann.comment,
+              }))).catch(() => {});
+            }
+          });
+        }
+      })
+      .catch(() => {});
   }, [taskId]);
 
-  const totalImages = apiImages.length > 0 ? apiImages.length : Math.min(task.totalImages, SAMPLE_IMAGES.length);
-  const rejectInfo = task.rejectReason ? { reviewer: 'Reviewer', comment: task.rejectReason } : undefined;
+  const totalImages = apiImages.length > 0 ? apiImages.length : (task?.totalImages ?? 0);
+  const project = projectFromCtx;
+  const rejectInfo = task?.rejectReason ? { reviewer: 'Reviewer', comment: task.rejectReason } : undefined;
 
   // ── Core state ──
   const [imageIdx, setImageIdx]    = useState(0);
   const [canvasSize, setCanvasSize] = useState({ width: 800, height: 600 });
-  const [zoom, setZoom]             = useState(1.0);
 
   // Annotations — loaded SYNCHRONOUSLY on image switch (no useEffect lag)
-  const [enriched, setEnriched]    = useState<EnrichedAnnotation[]>(() => loadAnnotations(task.id, 0));
+  const [enriched, setEnriched]    = useState<EnrichedAnnotation[]>(() => loadAnnotations(task?.id ?? '', 0));
 
-  const [activeLabel, setActiveLabel]  = useState<LabelDefinition>(labels[0] ?? { id: '', name: '', color: '#f97316' });
+  const [activeLabel, setActiveLabel]  = useState<LabelDefinition>({ id: '', name: '', color: '#f97316' });
+
+  // Cập nhật activeLabel khi labels load xong
+  useEffect(() => {
+    if (labels.length > 0 && !activeLabel.id) {
+      setActiveLabel(labels[0]);
+    }
+  }, [labels]);
   const [selectedId, setSelectedId]    = useState<string | null>(null);
-  const [confirmed, setConfirmed]      = useState<boolean>(() => isImageConfirmed(task.id, 0));
+  const [confirmed, setConfirmed]      = useState<boolean>(() => isImageConfirmed(task?.id ?? '', 0));
   const [guidelinesOpen, setGuidelinesOpen] = useState(false);
   const [rejectOpen, setRejectOpen]    = useState(!!rejectInfo);
   const [showReviewModal, setShowReviewModal] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // ── Canvas size measurement ──
+  // ── Chặn scroll zoom của react-picture-annotation ──
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const prevent = (e: WheelEvent) => e.preventDefault();
+    el.addEventListener('wheel', prevent, { passive: false });
+    return () => el.removeEventListener('wheel', prevent);
+  }, []);
+
+  // ── Canvas size — scale ảnh fit container, giữ tỉ lệ ──
   useEffect(() => {
     const measure = () => {
-      if (containerRef.current) {
-        setCanvasSize({
-          width:  containerRef.current.clientWidth,
-          height: containerRef.current.clientHeight,
-        });
+      if (!containerRef.current) return;
+      const cW = containerRef.current.clientWidth;
+      const cH = containerRef.current.clientHeight;
+      const img = apiImages[imageIdx];
+      if (img?.width > 0 && img?.height > 0) {
+        const scale = Math.min(cW / img.width, cH / img.height); // không cap 1, cho phép scale lên
+        setCanvasSize({ width: Math.floor(img.width * scale), height: Math.floor(img.height * scale) });
+      } else {
+        setCanvasSize({ width: cW, height: cH });
       }
     };
     measure();
     const ro = new ResizeObserver(measure);
     if (containerRef.current) ro.observe(containerRef.current);
     return () => ro.disconnect();
-  }, []);
+  }, [imageIdx, apiImages]);
 
   // ── Save to localStorage + API (fire-and-forget) ──
   const saveToLS = useCallback((anns: EnrichedAnnotation[], idx: number) => {
-    localStorage.setItem(LS_ANN_KEY(task.id, idx), JSON.stringify(anns));
+    const tid = task?.id ?? '';
+    localStorage.setItem(LS_ANN_KEY(tid, idx), JSON.stringify(anns));
     const imageId = apiImages[idx]?.id;
     if (imageId) {
       annotationsApi.bulkSave(imageId, anns.map(ann => ({
@@ -122,20 +177,36 @@ const LabelingWorkspace: React.FC = () => {
         width: ann.mark.width,
         height: ann.mark.height,
         comment: ann.comment,
-      }))).catch(() => { /* silent — localStorage is source of truth */ });
+      }))).catch(() => {});
     }
-  }, [task.id, apiImages]);
+  }, [task?.id, apiImages]);
 
-  // ── Navigate images — SYNCHRONOUSLY load new annotations ──
-  const goToImage = useCallback((nextIdx: number) => {
+  // ── Navigate images — load annotations từ localStorage, fallback sang API ──
+  const goToImage = useCallback(async (nextIdx: number) => {
     if (nextIdx < 0 || nextIdx >= totalImages) return;
-    const nextAnns = loadAnnotations(task.id, nextIdx);
-    const nextConfirmed = isImageConfirmed(task.id, nextIdx);
+    const tid = task?.id ?? '';
+    let nextAnns = loadAnnotations(tid, nextIdx);
+    // Nếu localStorage trống và có API image → thử load từ API
+    if (nextAnns.length === 0 && apiImages[nextIdx]?.id) {
+      try {
+        const apiAnns: any[] = await annotationsApi.list(apiImages[nextIdx].id) ?? [];
+        nextAnns = apiAnns.map((a: any) => ({
+          id: String(a.id),
+          mark: { x: a.x, y: a.y, width: a.width, height: a.height, type: 'RECT' },
+          comment: a.label_name,
+          labelId: String(a.label_id),
+          labelColor: a.label_color,
+          labelName: a.label_name,
+        }));
+        if (nextAnns.length > 0) localStorage.setItem(LS_ANN_KEY(tid, nextIdx), JSON.stringify(nextAnns));
+      } catch {}
+    }
+    const nextConfirmed = isImageConfirmed(tid, nextIdx) || (apiImages[nextIdx]?.is_confirmed ?? false);
     setImageIdx(nextIdx);
     setEnriched(nextAnns);
     setConfirmed(nextConfirmed);
     setSelectedId(null);
-  }, [task.id, totalImages]);
+  }, [task?.id, totalImages, apiImages]);
 
   const goNext = useCallback(() => goToImage(imageIdx + 1), [imageIdx, goToImage]);
   const goPrev = useCallback(() => goToImage(imageIdx - 1), [imageIdx, goToImage]);
@@ -146,8 +217,6 @@ const LabelingWorkspace: React.FC = () => {
       if (['INPUT', 'TEXTAREA', 'SELECT'].includes((e.target as HTMLElement).tagName)) return;
       if (e.key === 'n' || e.key === 'N') goNext();
       if (e.key === 'p' || e.key === 'P') goPrev();
-      if (e.key === '+' || e.key === '=') setZoom(z => Math.min(3, +(z + 0.25).toFixed(2)));
-      if (e.key === '-')                   setZoom(z => Math.max(0.5, +(z - 0.25).toFixed(2)));
       if ((e.key === 'Delete' || e.key === 'Backspace') && selectedId) deleteBox(selectedId);
     };
     window.addEventListener('keydown', handler);
@@ -169,10 +238,9 @@ const LabelingWorkspace: React.FC = () => {
     });
     setEnriched(newEnriched);
     saveToLS(newEnriched, imageIdx);
-    // Drawing a new box clears the confirmed status
     if (newEnriched.length > enriched.length) {
       setConfirmed(false);
-      localStorage.removeItem(LS_CONFIRM_KEY(task.id, imageIdx));
+      localStorage.removeItem(LS_CONFIRM_KEY(task?.id ?? '', imageIdx));
     }
   };
 
@@ -192,12 +260,26 @@ const LabelingWorkspace: React.FC = () => {
     saveToLS(next, imageIdx);
   };
 
-  // ── Confirm current image ──
-  const handleConfirmImage = () => {
-    localStorage.setItem(LS_CONFIRM_KEY(task.id, imageIdx), 'true');
+  // ── Confirm current image — save → confirm (đảm bảo annotations vào DB) ──
+  const handleConfirmImage = async () => {
+    localStorage.setItem(LS_CONFIRM_KEY(task?.id ?? '', imageIdx), 'true');
     setConfirmed(true);
     const imageId = apiImages[imageIdx]?.id;
     if (imageId) {
+      // Luôn sync annotations lên API trước khi confirm (fix race condition)
+      try {
+        await annotationsApi.bulkSave(imageId, enriched.map(ann => ({
+          label_id: ann.labelId || 'unlabeled',
+          label_name: ann.labelName || 'unlabeled',
+          label_color: ann.labelColor?.length === 7 ? ann.labelColor : '#cccccc',
+          annotation_type: 'bounding_box',
+          x: ann.mark.x,
+          y: ann.mark.y,
+          width: ann.mark.width,
+          height: ann.mark.height,
+          comment: ann.comment,
+        })));
+      } catch { /* silent */ }
       annotationsApi.confirmImage(imageId).catch(() => { /* silent */ });
     }
     toast.success(`✅ Đã xác nhận ảnh ${imageIdx + 1}/${totalImages}`);
@@ -214,7 +296,7 @@ const LabelingWorkspace: React.FC = () => {
       return;
     }
     const confirmedCount = Array.from({ length: totalImages }, (_, i) =>
-      isImageConfirmed(task.id, i)
+      isImageConfirmed(task?.id ?? '', i)
     ).filter(Boolean).length;
 
     if (confirmedCount < totalImages) {
@@ -222,6 +304,23 @@ const LabelingWorkspace: React.FC = () => {
         icon: '⚠️',
         duration: 4000,
       });
+    }
+    // Sync ảnh hiện tại lên API trước khi submit (phòng trường hợp chưa confirm)
+    const imageId = apiImages[imageIdx]?.id;
+    if (imageId && enriched.length > 0) {
+      try {
+        await annotationsApi.bulkSave(imageId, enriched.map(ann => ({
+          label_id: ann.labelId || 'unlabeled',
+          label_name: ann.labelName || 'unlabeled',
+          label_color: ann.labelColor?.length === 7 ? ann.labelColor : '#cccccc',
+          annotation_type: 'bounding_box',
+          x: ann.mark.x,
+          y: ann.mark.y,
+          width: ann.mark.width,
+          height: ann.mark.height,
+          comment: ann.comment,
+        })));
+      } catch { /* silent */ }
     }
     try {
       await updateTaskStatus(task.id, 'in-review');
@@ -232,11 +331,8 @@ const LabelingWorkspace: React.FC = () => {
 
   // Confirmed count for progress display
   const confirmedCount = Array.from({ length: totalImages }, (_, i) =>
-    isImageConfirmed(task.id, i)
+    isImageConfirmed(task?.id ?? '', i)
   ).filter(Boolean).length;
-
-  const effectiveWidth  = canvasSize.width  * zoom;
-  const effectiveHeight = canvasSize.height * zoom;
 
   return (
     <div className="workspace-layout">
@@ -304,36 +400,20 @@ const LabelingWorkspace: React.FC = () => {
               <Square size={22} />
             </button>
           </div>
-
-          {/* Zoom controls */}
-          <div className="zoom-group">
-            <button className="tool-btn" onClick={() => setZoom(z => Math.min(3, +(z + 0.25).toFixed(2)))} title="Phóng to (+)">
-              <ZoomIn size={20} />
-            </button>
-            <span className="zoom-label">{Math.round(zoom * 100)}%</span>
-            <button className="tool-btn" onClick={() => setZoom(z => Math.max(0.5, +(z - 0.25).toFixed(2)))} title="Thu nhỏ (-)">
-              <ZoomOut size={20} />
-            </button>
-            <button className="tool-btn" onClick={() => setZoom(1)} title="Reset zoom" style={{ fontSize: '0.65rem', color: '#64748b' }}>
-              1:1
-            </button>
-          </div>
-
           <div className="toolbar-hint">
-            <span>N</span><span>P</span><span>Del</span><span>+/-</span>
+            <span>N</span><span>P</span><span>Del</span>
           </div>
         </aside>
 
-        {/* Canvas — overflow:auto enables scrolling when zoomed in */}
-        <div className="workspace-canvas" ref={containerRef}>
-          <div style={{ width: effectiveWidth, height: effectiveHeight, minWidth: '100%', minHeight: '100%' }}>
+        <div className="workspace-canvas" ref={containerRef} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'auto' }}>
+          <div style={{ width: canvasSize.width, height: canvasSize.height, flexShrink: 0 }}>
             <ReactPictureAnnotation
-              key={`${task.id}_${imageIdx}_${zoom}`}
-              image={apiImages[imageIdx]?.file_url || SAMPLE_IMAGES[imageIdx % SAMPLE_IMAGES.length]}
+              key={`${task?.id}_${imageIdx}`}
+              image={apiImages[imageIdx]?.url || undefined}
               onSelect={setSelectedId as any}
               onChange={handleChange as any}
-              width={effectiveWidth}
-              height={effectiveHeight}
+              width={canvasSize.width}
+              height={canvasSize.height}
               annotationData={enriched as any}
               defaultAnnotationSize={[] as any}
             />

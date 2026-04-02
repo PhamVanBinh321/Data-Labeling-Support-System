@@ -82,15 +82,6 @@ const Sidebar: React.FC = () => {
         {renderNavItems()}
       </nav>
 
-      <div className="sidebar-footer">
-        <div className="user-profile-mini">
-          <div className="avatar avatar-sm">AD</div>
-          <div className="user-info">
-            <span className="user-name">Admin User</span>
-            <span className="user-email">Role: {activeRole}</span>
-          </div>
-        </div>
-      </div>
     </aside>
   );
 };

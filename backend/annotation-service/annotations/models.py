@@ -28,7 +28,8 @@ class ImageFile(models.Model):
 
     @property
     def url(self):
-        return f'/media/{self.file_path}'
+        from annotations.storage import get_public_url
+        return get_public_url(self.file_path)
 
     def __str__(self):
         if self.task_id:

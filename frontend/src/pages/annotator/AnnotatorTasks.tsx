@@ -1,20 +1,28 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Search, Clock, AlertTriangle, CheckCircle,
-  XCircle, Eye, ChevronRight, ClipboardList
+  XCircle, Eye, ChevronRight, ClipboardList, Mail
 } from 'lucide-react';
-import { MOCK_USERS } from '../../data/mockData';
 import type { Task } from '../../data/mockData';
 import { useData } from '../../context/DataContext';
+import { useAuth } from '../../context/AuthContext';
+import { projectsApi } from '../../api/projects';
 import StatusBadge from '../../components/common/StatusBadge';
 import type { StatusType } from '../../components/common/StatusBadge';
 import DataTable from '../../components/common/DataTable';
 import TaskDetailPanel from '../../components/annotator/TaskDetailPanel';
+import toast from 'react-hot-toast';
 import './AnnotatorTasks.css';
 
-// ── Logged-in annotator (always usr-002 for now) ──
-const ME = MOCK_USERS.find(u => u.id === 'usr-002')!;
+type Invitation = {
+  id: number;
+  project_id: number;
+  project_name: string;
+  project_type: string;
+  role: string;
+  invited_at: string;
+};
 
 type FilterTab = 'all' | 'todo' | 'in-review' | 'done' | 'rejected';
 
@@ -43,14 +51,36 @@ const PRIORITY_ICON = {
 const AnnotatorTasks: React.FC = () => {
   const navigate = useNavigate();
   const { tasks, projects } = useData();
+  const { user } = useAuth();
   const [search, setSearch] = useState('');
   const [activeTab, setActiveTab] = useState<FilterTab>('all');
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [invitations, setInvitations] = useState<Invitation[]>([]);
+  const [respondingId, setRespondingId] = useState<number | null>(null);
+
+  useEffect(() => {
+    projectsApi.myInvitations()
+      .then(data => setInvitations(data ?? []))
+      .catch(() => {});
+  }, []);
+
+  const handleRespond = async (inv: Invitation, action: 'active' | 'declined') => {
+    setRespondingId(inv.id);
+    try {
+      await projectsApi.updateMemberStatus(inv.project_id, inv.id, action);
+      setInvitations(prev => prev.filter(i => i.id !== inv.id));
+      toast.success(action === 'active' ? `Đã tham gia dự án "${inv.project_name}"!` : 'Đã từ chối lời mời.');
+    } catch {
+      toast.error('Thao tác thất bại, thử lại.');
+    } finally {
+      setRespondingId(null);
+    }
+  };
 
   // All tasks assigned to current annotator
   const myTasks = useMemo(
-    () => tasks.filter(t => t.annotatorId === ME.id),
-    [tasks]
+    () => tasks.filter(t => String(t.annotatorId) === String(user?.id ?? '')),
+    [tasks, user]
   );
 
   const filtered = useMemo(() => {
@@ -183,9 +213,48 @@ const AnnotatorTasks: React.FC = () => {
       <div className="at-page-header">
         <div>
           <h1><ClipboardList size={22} /> Danh sách Task của tôi</h1>
-          <p className="page-subtitle">Xin chào, <strong>{ME.name}</strong>! Dưới đây là các task được giao cho bạn.</p>
+          <p className="page-subtitle">
+          Xin chào, <strong>{user?.name ?? '...'}</strong>!
+          {' '}<span style={{ color: '#94a3b8', fontSize: '0.85em' }}>(ID: {user?.id ?? '—'})</span>
+          {' '}Dưới đây là các task được giao cho bạn.
+        </p>
         </div>
       </div>
+
+      {/* Pending invitations */}
+      {invitations.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
+          {invitations.map(inv => (
+            <div key={inv.id} style={{
+              display: 'flex', alignItems: 'center', gap: '12px',
+              padding: '12px 16px', borderRadius: '8px',
+              background: '#eff6ff', border: '1px solid #bfdbfe',
+            }}>
+              <Mail size={18} color="#3b82f6" style={{ flexShrink: 0 }} />
+              <div style={{ flex: 1 }}>
+                <strong style={{ fontSize: '0.9rem' }}>Lời mời tham gia dự án</strong>
+                <div style={{ fontSize: '0.82rem', color: '#475569', marginTop: '2px' }}>
+                  <strong>{inv.project_name}</strong> · Role: <strong style={{ textTransform: 'capitalize' }}>{inv.role}</strong>
+                </div>
+              </div>
+              <button
+                className="btn btn-sm btn-primary"
+                disabled={respondingId === inv.id}
+                onClick={() => handleRespond(inv, 'active')}
+              >
+                Chấp nhận
+              </button>
+              <button
+                className="btn btn-sm btn-secondary"
+                disabled={respondingId === inv.id}
+                onClick={() => handleRespond(inv, 'declined')}
+              >
+                Từ chối
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Stats row */}
       <div className="stats-row">

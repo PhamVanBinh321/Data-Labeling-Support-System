@@ -100,15 +100,12 @@ const CreateProject: React.FC = () => {
       {/* Stepper */}
       <div className="stepper">
         {STEPS.map((s, i) => (
-          <React.Fragment key={i}>
-            <div className={`step-item ${i === step ? 'active' : i < step ? 'done' : ''}`}>
-              <div className="step-circle">
-                {i < step ? <Check size={16} /> : <span>{i + 1}</span>}
-              </div>
-              <span className="step-label">{s}</span>
+          <div key={i} className={`step-item ${i === step ? 'active' : i < step ? 'done' : ''}`}>
+            <div className="step-circle">
+              {i < step ? <Check size={16} /> : <span>{i + 1}</span>}
             </div>
-            {i < STEPS.length - 1 && <div className={`step-connector ${i < step ? 'done' : ''}`} />}
-          </React.Fragment>
+            <span className="step-label">{s}</span>
+          </div>
         ))}
       </div>
 

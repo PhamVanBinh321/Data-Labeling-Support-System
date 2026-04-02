@@ -1,5 +1,7 @@
+import requests
 from datetime import date, datetime, timezone
 
+from django.conf import settings
 from django.db import transaction
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
@@ -12,6 +14,52 @@ from .serializers import (
 )
 from .permissions import IsManager, IsAnnotator, IsReviewer, IsAnyRole, IsInternalService
 from .utils import success_response, error_response
+
+
+# ─── SERVICE HELPERS ─────────────────────────────────────────────────────────
+
+def _send_notification(recipient_id, notif_type, title, message, task_id, project_id):
+    """Gọi notification-service internal API. Fire-and-forget, không raise exception."""
+    try:
+        requests.post(
+            f'{settings.NOTIFICATION_SERVICE_URL}/api/notify/internal/',
+            json={
+                'recipient_id': recipient_id,
+                'type': notif_type,
+                'title': title,
+                'message': message,
+                'task_id': task_id,
+                'project_id': project_id,
+            },
+            headers={'X-Internal-Service': 'true'},
+            timeout=2,
+        )
+    except Exception:
+        pass
+
+
+def _sync_project_counters(project_id):
+    """
+    Tính lại counters cho project từ tất cả tasks, rồi PATCH sang project-service.
+    Fire-and-forget — không raise exception để không ảnh hưởng task flow.
+    """
+    try:
+        tasks = Task.objects.filter(project_id=project_id)
+        total     = sum(t.total_images for t in tasks)
+        annotated = sum(t.total_images for t in tasks if t.status in (
+            Task.Status.IN_REVIEW, Task.Status.APPROVED, Task.Status.COMPLETED
+        ))
+        approved  = sum(t.total_images for t in tasks if t.status in (
+            Task.Status.APPROVED, Task.Status.COMPLETED
+        ))
+        requests.patch(
+            f'{settings.PROJECT_SERVICE_URL}/api/projects/internal/projects/{project_id}/counters/',
+            json={'total_images': total, 'annotated_images': annotated, 'approved_images': approved},
+            headers={'X-Internal-Service': 'true'},
+            timeout=2,
+        )
+    except Exception:
+        pass
 
 
 # ─── TASK CRUD ────────────────────────────────────────────────────────────────
@@ -187,6 +235,39 @@ class TaskStatusView(APIView):
                 to_status=new_status,
                 changed_by=request.user.id,
                 reject_reason=reject_reason,
+            )
+
+        # Đồng bộ counters sang project-service (fire-and-forget)
+        _sync_project_counters(task.project_id)
+
+        # Gửi notification sau khi đổi status (fire-and-forget)
+        if new_status == Task.Status.IN_PROGRESS:
+            _send_notification(
+                task.annotator_id, 'task_assigned',
+                'Task đã sẵn sàng',
+                f'Task "{task.name}" đã được mở, hãy bắt đầu.',
+                task.id, task.project_id,
+            )
+        elif new_status == Task.Status.IN_REVIEW:
+            _send_notification(
+                task.reviewer_id, 'task_submitted',
+                'Task cần review',
+                f'Annotator đã nộp task "{task.name}".',
+                task.id, task.project_id,
+            )
+        elif new_status == Task.Status.APPROVED:
+            _send_notification(
+                task.annotator_id, 'task_approved',
+                'Task được duyệt',
+                f'Task "{task.name}" đã được reviewer chấp thuận.',
+                task.id, task.project_id,
+            )
+        elif new_status == Task.Status.REJECTED:
+            _send_notification(
+                task.annotator_id, 'task_rejected',
+                'Task bị từ chối',
+                f'Task "{task.name}" bị từ chối: {reject_reason}',
+                task.id, task.project_id,
             )
 
         return success_response(

@@ -29,6 +29,21 @@ MIDDLEWARE = [
 ROOT_URLCONF = 'config.urls'
 WSGI_APPLICATION = 'config.wsgi.application'
 
+TEMPLATES = [
+    {
+        'BACKEND': 'django.template.backends.django.DjangoTemplates',
+        'DIRS': [],
+        'APP_DIRS': True,
+        'OPTIONS': {
+            'context_processors': [
+                'django.template.context_processors.request',
+                'django.contrib.auth.context_processors.auth',
+                'django.contrib.messages.context_processors.messages',
+            ],
+        },
+    },
+]
+
 DATABASE_URL = config('DATABASE_URL')
 _db = DATABASE_URL.replace('postgresql://', '').replace('postgres://', '')
 _creds, _rest = _db.split('@')
@@ -50,8 +65,13 @@ DATABASES = {
 AUTH_SERVICE_URL = config('AUTH_SERVICE_URL', default='http://auth-service:8001')
 TASK_SERVICE_URL = config('TASK_SERVICE_URL', default='http://task-service:8003')
 
-MEDIA_ROOT = config('MEDIA_ROOT', default='/media')
-MEDIA_URL = '/media/'
+# ── MinIO Object Storage ───────────────────────────────────────────────────────
+MINIO_ENDPOINT   = config('MINIO_ENDPOINT',   default='minio:9000')
+MINIO_ACCESS_KEY = config('MINIO_ACCESS_KEY', default='minioadmin')
+MINIO_SECRET_KEY = config('MINIO_SECRET_KEY', default='minioadmin')
+MINIO_BUCKET     = config('MINIO_BUCKET',     default='dlss-media')
+MINIO_PUBLIC_HOST = config('MINIO_PUBLIC_HOST', default='http://localhost:9000')
+MINIO_USE_SSL    = config('MINIO_USE_SSL',    default=False, cast=bool)
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (

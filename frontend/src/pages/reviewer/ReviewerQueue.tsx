@@ -1,12 +1,22 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, CheckCircle, XCircle, Eye } from 'lucide-react';
+import { Search, CheckCircle, XCircle, Eye, Mail } from 'lucide-react';
 import DataTable from '../../components/common/DataTable';
 import StatusBadge from '../../components/common/StatusBadge';
 import type { StatusType } from '../../components/common/StatusBadge';
 import toast from 'react-hot-toast';
 import { useData } from '../../context/DataContext';
+import { projectsApi } from '../../api/projects';
 import './ReviewerQueue.css';
+
+type Invitation = {
+  id: number;
+  project_id: number;
+  project_name: string;
+  project_type: string;
+  role: string;
+  invited_at: string;
+};
 
 interface ReviewTask {
   id: string;
@@ -22,6 +32,27 @@ const ReviewerQueue: React.FC = () => {
   const { tasks, getProjectById, getUserById, updateTaskStatus } = useData();
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [invitations, setInvitations] = useState<Invitation[]>([]);
+  const [respondingId, setRespondingId] = useState<number | null>(null);
+
+  useEffect(() => {
+    projectsApi.myInvitations()
+      .then(data => setInvitations(data ?? []))
+      .catch(() => {});
+  }, []);
+
+  const handleRespond = async (inv: Invitation, action: 'active' | 'declined') => {
+    setRespondingId(inv.id);
+    try {
+      await projectsApi.updateMemberStatus(inv.project_id, inv.id, action);
+      setInvitations(prev => prev.filter(i => i.id !== inv.id));
+      toast.success(action === 'active' ? `Đã tham gia dự án "${inv.project_name}"!` : 'Đã từ chối lời mời.');
+    } catch {
+      toast.error('Thao tác thất bại, thử lại.');
+    } finally {
+      setRespondingId(null);
+    }
+  };
 
   const allReviewTasks: ReviewTask[] = tasks
     .filter(t => ['in-review', 'approved', 'rejected', 'completed'].includes(t.status))
@@ -159,6 +190,30 @@ const ReviewerQueue: React.FC = () => {
           </select>
         </div>
       </div>
+
+      {invitations.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
+          {invitations.map(inv => (
+            <div key={inv.id} style={{
+              display: 'flex', alignItems: 'center', gap: '12px',
+              padding: '12px 16px', borderRadius: '8px',
+              background: '#eff6ff', border: '1px solid #bfdbfe',
+            }}>
+              <Mail size={18} color="#3b82f6" style={{ flexShrink: 0 }} />
+              <div style={{ flex: 1 }}>
+                <strong style={{ fontSize: '0.9rem' }}>Lời mời tham gia dự án</strong>
+                <div style={{ fontSize: '0.82rem', color: '#475569', marginTop: '2px' }}>
+                  <strong>{inv.project_name}</strong> · Role: <strong style={{ textTransform: 'capitalize' }}>{inv.role}</strong>
+                </div>
+              </div>
+              <button className="btn btn-sm btn-primary" disabled={respondingId === inv.id}
+                onClick={() => handleRespond(inv, 'active')}>Chấp nhận</button>
+              <button className="btn btn-sm btn-secondary" disabled={respondingId === inv.id}
+                onClick={() => handleRespond(inv, 'declined')}>Từ chối</button>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className="stats-row">
         <div className="stat-card">

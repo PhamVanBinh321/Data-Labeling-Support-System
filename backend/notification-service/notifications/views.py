@@ -7,6 +7,7 @@ from .models import Notification
 from .serializers import NotificationSerializer, CreateNotificationSerializer, BulkCreateNotificationSerializer
 from .permissions import IsAnyRole, IsInternalService
 from .utils import success_response, error_response
+from .cache import get_unread_count, set_unread_count, invalidate_unread_count
 
 
 # ─── PAGINATION ───────────────────────────────────────────────────────────────
@@ -60,10 +61,14 @@ class UnreadCountView(APIView):
     permission_classes = [IsAuthenticated, IsAnyRole]
 
     def get(self, request):
-        count = Notification.objects.filter(
-            recipient_id=request.user.id,
-            is_read=False,
-        ).count()
+        user_id = request.user.id
+        count = get_unread_count(user_id)
+        if count is None:
+            count = Notification.objects.filter(
+                recipient_id=user_id,
+                is_read=False,
+            ).count()
+            set_unread_count(user_id, count)
         return success_response({'unread_count': count})
 
 
@@ -85,6 +90,7 @@ class NotificationMarkReadView(APIView):
 
         notif.is_read = True
         notif.save(update_fields=['is_read'])
+        invalidate_unread_count(request.user.id)
         return success_response(NotificationSerializer(notif).data, message='Đã đánh dấu đã đọc.')
 
 
@@ -100,6 +106,7 @@ class NotificationReadAllView(APIView):
             recipient_id=request.user.id,
             is_read=False,
         ).update(is_read=True)
+        invalidate_unread_count(request.user.id)
         return success_response(
             {'updated': updated},
             message=f'Đã đánh dấu {updated} notification đã đọc.',
@@ -120,6 +127,7 @@ class NotificationDeleteView(APIView):
             return error_response('Không tìm thấy notification.', status=404)
 
         notif.delete()
+        invalidate_unread_count(request.user.id)
         return success_response(message='Đã xóa notification.')
 
 
@@ -141,6 +149,7 @@ class InternalCreateNotificationView(APIView):
             return error_response('Dữ liệu không hợp lệ.', errors=serializer.errors)
 
         notif = Notification.objects.create(**serializer.validated_data)
+        invalidate_unread_count(notif.recipient_id)
         return success_response(
             NotificationSerializer(notif).data,
             message='Tạo notification thành công.',
@@ -169,6 +178,11 @@ class InternalBulkCreateNotificationView(APIView):
             new_notifs = Notification.objects.bulk_create([
                 Notification(**item) for item in items
             ])
+
+        # Invalidate cache cho từng recipient bị ảnh hưởng
+        affected_users = {item['recipient_id'] for item in items}
+        for uid in affected_users:
+            invalidate_unread_count(uid)
 
         return success_response(
             NotificationSerializer(new_notifs, many=True).data,

@@ -117,6 +117,16 @@ class ProjectMemberSerializer(serializers.ModelSerializer):
         read_only_fields = ('id', 'project_id', 'invited_at', 'joined_at')
 
 
+class MyInvitationSerializer(serializers.ModelSerializer):
+    project_name = serializers.CharField(source='project.name', read_only=True)
+    project_type = serializers.CharField(source='project.type', read_only=True)
+
+    class Meta:
+        model = ProjectMember
+        fields = ('id', 'project_id', 'project_name', 'project_type', 'role', 'status', 'invited_at')
+        read_only_fields = fields
+
+
 class InviteMemberSerializer(serializers.Serializer):
     user_id = serializers.IntegerField()
     role = serializers.ChoiceField(choices=ProjectMember.Role.choices)

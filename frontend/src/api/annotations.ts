@@ -109,7 +109,7 @@ export const annotationsApi = {
   // Export
   exportTask: async (task_id: number, format: 'coco' | 'yolo' | 'csv') => {
     const res = await client.get(`/api/annotations/tasks/${task_id}/export/`, {
-      params: { format },
+      params: { export_format: format },
       responseType: 'blob',
     });
     return res;

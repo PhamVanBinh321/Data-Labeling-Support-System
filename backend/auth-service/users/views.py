@@ -5,7 +5,24 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.tokens import RefreshToken
 
+from django.core.cache import cache
+
 from .tokens import CustomRefreshToken
+from .redis_blacklist import blacklist_access_token
+
+USER_CACHE_TTL = 300  # 5 phút
+
+
+def _user_cache_key(user_id):
+    return f'user_profile:{user_id}'
+
+
+def _cache_user(user):
+    cache.set(_user_cache_key(user.id), UserSerializer(user).data, timeout=USER_CACHE_TTL)
+
+
+def _invalidate_user(user_id):
+    cache.delete(_user_cache_key(user_id))
 
 from .models import User
 from .serializers import (
@@ -99,6 +116,9 @@ def logout(request):
     try:
         token = RefreshToken(refresh_token)
         token.blacklist()
+        # Blacklist access token in Redis so it's immediately invalidated
+        if hasattr(request, 'auth') and request.auth:
+            blacklist_access_token(request.auth.payload)
         return success_response(message='Đăng xuất thành công.')
     except TokenError:
         return error_response(
@@ -142,10 +162,12 @@ def me(request):
     GET /api/auth/me/
     Trả về thông tin user đang đăng nhập.
     """
-    return success_response(
-        data=UserSerializer(request.user).data,
-        message='',
-    )
+    user_id = request.user.id
+    data = cache.get(_user_cache_key(user_id))
+    if data is None:
+        data = UserSerializer(request.user).data
+        cache.set(_user_cache_key(user_id), data, timeout=USER_CACHE_TTL)
+    return success_response(data=data, message='')
 
 
 @api_view(['PATCH'])
@@ -167,6 +189,7 @@ def update_profile(request):
             status=status.HTTP_400_BAD_REQUEST,
         )
     user = serializer.save()
+    _invalidate_user(user.id)
     return success_response(
         data=UserSerializer(user).data,
         message='Cập nhật thông tin thành công.',
@@ -192,6 +215,7 @@ def change_password(request):
         )
     request.user.set_password(serializer.validated_data['new_password'])
     request.user.save(update_fields=['password', 'updated_at'])
+    _invalidate_user(request.user.id)
     return success_response(message='Đổi mật khẩu thành công. Vui lòng đăng nhập lại.')
 
 
@@ -216,6 +240,7 @@ def set_role(request):
     user.role = serializer.validated_data['role']
     user.role_confirmed = True
     user.save(update_fields=['role', 'role_confirmed', 'updated_at'])
+    _invalidate_user(user.id)
     return success_response(
         data=UserSerializer(user).data,
         message=f'Role đã được đặt thành "{user.get_role_display()}".',
@@ -263,11 +288,15 @@ def get_user(request, user_id):
     GET /api/auth/users/<user_id>/
     Internal endpoint — project/task service gọi để lấy thông tin 1 user.
     """
-    try:
-        user = User.objects.get(id=user_id, is_active=True)
-    except User.DoesNotExist:
-        return error_response(
-            message=f'Không tìm thấy user với id={user_id}.',
-            status=status.HTTP_404_NOT_FOUND,
-        )
-    return success_response(data=UserSerializer(user).data, message='')
+    data = cache.get(_user_cache_key(user_id))
+    if data is None:
+        try:
+            user = User.objects.get(id=user_id, is_active=True)
+        except User.DoesNotExist:
+            return error_response(
+                message=f'Không tìm thấy user với id={user_id}.',
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        data = UserSerializer(user).data
+        cache.set(_user_cache_key(user_id), data, timeout=USER_CACHE_TTL)
+    return success_response(data=data, message='')

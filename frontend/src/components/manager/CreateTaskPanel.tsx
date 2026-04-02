@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, ChevronRight, AlertTriangle, Users, Calendar, Image } from 'lucide-react';
-import type { Project } from '../../data/mockData';
+import type { Project, Task } from '../../data/mockData';
 import toast from 'react-hot-toast';
 import './CreateTaskPanel.css';
 import { tasksApi } from '../../api/tasks';
@@ -37,6 +37,7 @@ const CreateTaskPanel: React.FC<CreateTaskPanelProps> = ({ project, existingTask
   const [submitting, setSubmitting] = useState(false);
   const [members, setMembers]       = useState<ApiMember[]>([]);
   const [loadingMembers, setLoadingMembers] = useState(true);
+  const [unassignedCount, setUnassignedCount] = useState<number | null>(null);
 
   useEffect(() => {
     projectsApi.listMembers(Number(project.id))
@@ -45,18 +46,26 @@ const CreateTaskPanel: React.FC<CreateTaskPanelProps> = ({ project, existingTask
       .finally(() => setLoadingMembers(false));
   }, [project.id]);
 
+  useEffect(() => {
+    annotationsApi.listProjectImages(Number(project.id))
+      .then((res: any) => setUnassignedCount(res?.unassigned_count ?? 0))
+      .catch(() => setUnassignedCount(0));
+  }, [project.id]);
+
   const memberAnnotators = members.filter(m => m.role === 'annotator');
   const memberReviewers  = members.filter(m => m.role === 'reviewer');
 
-  const imagesUsed      = existingTasks.reduce((sum, t) => sum + t.totalImages, 0);
-  const imagesRemaining = project.totalImages - imagesUsed;
-  const imageCount      = Math.max(0, form.imageTo - form.imageFrom + 1);
+  const imageCount = Math.max(0, form.imageTo - form.imageFrom + 1);
+  const poolLoaded = unassignedCount !== null;
+  const notEnoughImages = poolLoaded && imageCount > unassignedCount!;
 
   const validate = () => {
     const e: Record<string, string> = {};
     if (!form.name.trim())                   e.name        = 'Tên batch không được để trống.';
     if (form.imageFrom < 1)                  e.imageFrom   = 'Số ảnh bắt đầu phải >= 1.';
     if (form.imageTo < form.imageFrom)       e.imageTo     = 'Ảnh kết thúc phải >= ảnh bắt đầu.';
+    if (poolLoaded && imageCount > unassignedCount!)
+      e.imageTo = `Chỉ còn ${unassignedCount} ảnh chưa được phân công. Không thể tạo task với ${imageCount} ảnh.`;
     if (!form.annotatorId)                   e.annotatorId = 'Vui lòng chọn Annotator.';
     if (!form.reviewerId)                    e.reviewerId  = 'Vui lòng chọn Reviewer.';
     if (!form.deadline)                      e.deadline    = 'Vui lòng chọn hạn chót.';
@@ -69,6 +78,7 @@ const CreateTaskPanel: React.FC<CreateTaskPanelProps> = ({ project, existingTask
     if (Object.keys(errs).length > 0) { setErrors(errs); return; }
 
     setSubmitting(true);
+    let createdTaskId: number | null = null;
     try {
       const created = await tasksApi.create({
         project_id:   Number(project.id),
@@ -78,19 +88,23 @@ const CreateTaskPanel: React.FC<CreateTaskPanelProps> = ({ project, existingTask
         deadline:     form.deadline,
         priority:     form.priority,
       });
-      // Gán ảnh từ project pool vào task (fire-and-forget nếu pool rỗng)
+      createdTaskId = created.id;
+
+      // Gán ảnh — nếu thất bại thì rollback xóa task vừa tạo
       if (imageCount > 0) {
-        try {
-          await annotationsApi.assignImagesToTask(Number(project.id), created.id, imageCount);
-        } catch {
-          // Pool rỗng hoặc không đủ ảnh — không block tạo task
-        }
+        await annotationsApi.assignImagesToTask(Number(project.id), created.id, imageCount);
       }
+
       toast.success(`Đã tạo task "${form.name}" thành công!`);
       await onSubmit();
       onClose();
-    } catch {
-      toast.error('Tạo task thất bại. Kiểm tra lại thông tin.');
+    } catch (err: any) {
+      // Rollback: xóa task nếu assign ảnh thất bại
+      if (createdTaskId) {
+        try { await tasksApi.delete(createdTaskId); } catch { /* best-effort */ }
+      }
+      const msg = err?.response?.data?.message || 'Tạo task thất bại. Kiểm tra lại thông tin.';
+      toast.error(msg);
       setSubmitting(false);
     }
   };
@@ -114,12 +128,20 @@ const CreateTaskPanel: React.FC<CreateTaskPanelProps> = ({ project, existingTask
 
         <div className="panel-info-strip">
           <span><Image size={14} /> Tổng dataset: <strong>{project.totalImages.toLocaleString()}</strong> ảnh</span>
-          <span className={imagesRemaining < 0 ? 'danger' : ''}>
-            Chưa chia: <strong>{Math.max(0, imagesRemaining).toLocaleString()}</strong> ảnh
+          <span className={unassignedCount === 0 ? 'danger' : ''}>
+            Chưa phân công: <strong>
+              {poolLoaded ? unassignedCount!.toLocaleString() : '...'}
+            </strong> ảnh
           </span>
           <span><Users size={14} /> Annotators: <strong>{memberAnnotators.length}</strong></span>
         </div>
 
+        {poolLoaded && unassignedCount === 0 && (
+          <div className="panel-warning">
+            <AlertTriangle size={16} />
+            Tất cả ảnh trong project đã được phân công cho task khác. Không thể tạo task mới.
+          </div>
+        )}
         {!loadingMembers && memberAnnotators.length === 0 && (
           <div className="panel-warning">
             <AlertTriangle size={16} />
@@ -147,14 +169,14 @@ const CreateTaskPanel: React.FC<CreateTaskPanelProps> = ({ project, existingTask
             <div className="range-inputs">
               <div className="range-input-wrap">
                 <span className="range-label">Từ ảnh</span>
-                <input type="number" min={1} max={project.totalImages} value={form.imageFrom}
+                <input type="number" min={1} value={form.imageFrom}
                   onChange={e => setForm({ ...form, imageFrom: Number(e.target.value) })}
                   className={errors.imageFrom ? 'error' : ''} />
               </div>
               <span className="range-sep">→</span>
               <div className="range-input-wrap">
                 <span className="range-label">Đến ảnh</span>
-                <input type="number" min={1} max={project.totalImages} value={form.imageTo}
+                <input type="number" min={1} value={form.imageTo}
                   onChange={e => setForm({ ...form, imageTo: Number(e.target.value) })}
                   className={errors.imageTo ? 'error' : ''} />
               </div>
@@ -163,8 +185,19 @@ const CreateTaskPanel: React.FC<CreateTaskPanelProps> = ({ project, existingTask
               <span className="field-error">{errors.imageFrom || errors.imageTo}</span>
             )}
             {imageCount > 0 && (
-              <div className="image-count-badge">
+              <div className={`image-count-badge ${notEnoughImages ? 'danger' : ''}`}>
                 <Image size={13} /> Task này sẽ có <strong>{imageCount.toLocaleString()} ảnh</strong>
+                {poolLoaded && !notEnoughImages && (
+                  <span style={{ color: '#6b7280', marginLeft: 6 }}>
+                    (còn {unassignedCount} ảnh chưa phân công)
+                  </span>
+                )}
+              </div>
+            )}
+            {notEnoughImages && (
+              <div className="panel-warning" style={{ marginTop: 8 }}>
+                <AlertTriangle size={14} />
+                Chỉ còn <strong>{unassignedCount}</strong> ảnh chưa được phân công. Hãy giảm số lượng.
               </div>
             )}
           </div>
@@ -247,7 +280,7 @@ const CreateTaskPanel: React.FC<CreateTaskPanelProps> = ({ project, existingTask
 
           <div className="panel-footer">
             <button type="button" className="btn btn-secondary" onClick={onClose}>Hủy</button>
-            <button type="submit" className="btn btn-primary" disabled={submitting}>
+            <button type="submit" className="btn btn-primary" disabled={submitting || notEnoughImages || unassignedCount === 0}>
               {submitting ? 'Đang tạo...' : 'Tạo Task'}
             </button>
           </div>

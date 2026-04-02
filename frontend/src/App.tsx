@@ -22,7 +22,8 @@ import { Toaster } from 'react-hot-toast';
 
 // Simple wrapper for protected routes outside of DashboardLayout
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, loading } = useAuth();
+  if (loading) return null; // Wait for auth check before redirecting
   if (!isAuthenticated) return <Navigate to="/login" replace />;
   return <>{children}</>;
 };

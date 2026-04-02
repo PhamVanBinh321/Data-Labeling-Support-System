@@ -1,3 +1,5 @@
+import requests
+
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
@@ -9,10 +11,33 @@ from .serializers import (
     ProjectListSerializer, ProjectDetailSerializer,
     ProjectCreateSerializer, ProjectUpdateSerializer, ProjectStatusSerializer,
     LabelDefinitionSerializer, LabelDefinitionCreateSerializer,
-    ProjectMemberSerializer, InviteMemberSerializer, UpdateMemberStatusSerializer,
+    ProjectMemberSerializer, MyInvitationSerializer, InviteMemberSerializer, UpdateMemberStatusSerializer,
     DatasetSerializer, DatasetCreateSerializer, DatasetUpdateSerializer,
 )
 from .utils import success_response, error_response
+
+
+# ─── SERVICE HELPERS ─────────────────────────────────────────────────────────
+
+def _send_notification(recipient_id, notif_type, title, message, task_id, project_id):
+    """Gọi notification-service internal API. Fire-and-forget, không raise exception."""
+    from django.conf import settings
+    try:
+        requests.post(
+            f'{settings.NOTIFICATION_SERVICE_URL}/api/notify/internal/',
+            json={
+                'recipient_id': recipient_id,
+                'type': notif_type,
+                'title': title,
+                'message': message,
+                'task_id': task_id,
+                'project_id': project_id,
+            },
+            headers={'X-Internal-Service': 'true'},
+            timeout=2,
+        )
+    except Exception:
+        pass  # Không để lỗi notify ảnh hưởng project flow
 
 
 # ─── Projects ─────────────────────────────────────────────────────────────────
@@ -59,6 +84,17 @@ class ProjectListCreateView(APIView):
             message='Tạo project thành công.',
             status=status.HTTP_201_CREATED,
         )
+
+
+class MyInvitationsView(APIView):
+    """GET /api/projects/my-invitations/ — danh sách lời mời pending của user hiện tại."""
+
+    def get(self, request):
+        invitations = ProjectMember.objects.select_related('project').filter(
+            user_id=request.user.id,
+            status=ProjectMember.Status.PENDING,
+        ).order_by('-invited_at')
+        return success_response(data=MyInvitationSerializer(invitations, many=True).data)
 
 
 class ProjectDetailView(APIView):
@@ -287,6 +323,15 @@ class MemberListCreateView(APIView):
             project=project,
             user_id=serializer.validated_data['user_id'],
             role=serializer.validated_data['role'],
+        )
+        user_id = serializer.validated_data['user_id']
+        _send_notification(
+            recipient_id=user_id,
+            notif_type='member_invited',
+            title='Bạn được mời vào project',
+            message=f'Manager đã mời bạn tham gia project "{project.name}".',
+            task_id=None,
+            project_id=project.id,
         )
         return success_response(
             data=ProjectMemberSerializer(member).data,

@@ -68,16 +68,8 @@ const mapProject = (p: any): Project => ({
 export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const { isAuthenticated } = useAuth();
 
-  const [tasks, setTasks] = useState<Task[]>(() => {
-    // Giữ mock làm fallback ban đầu — sẽ bị replace khi fetch thành công
-    const saved = localStorage.getItem('annotate_pro_tasks');
-    if (saved) {
-      try { return JSON.parse(saved); } catch { /* ignore */ }
-    }
-    return MOCK_TASKS;
-  });
-
-  const [projects, setProjects] = useState<Project[]>(MOCK_PROJECTS);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
   const [users] = useState<User[]>(MOCK_USERS);
   const [loading, setLoading] = useState(false);
 
@@ -85,12 +77,9 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       const data = await tasksApi.list();
       const mapped = Array.isArray(data) ? data.map(mapTask) : [];
-      if (mapped.length > 0) {
-        setTasks(mapped);
-        localStorage.setItem('annotate_pro_tasks', JSON.stringify(mapped));
-      }
+      setTasks(mapped); // luôn update kể cả khi rỗng
     } catch {
-      // API lỗi → giữ nguyên mock/cached data
+      // giữ nguyên nếu API lỗi
     }
   }, []);
 
@@ -98,13 +87,11 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       const data = await projectsApi.list();
       const mapped = Array.isArray(data) ? data.map(mapProject) : [];
-      if (mapped.length > 0) setProjects(mapped);
-    } catch {
-      // API lỗi → giữ nguyên mock data
-    }
+      setProjects(mapped);
+    } catch {}
   }, []);
 
-  // Fetch khi user đăng nhập
+  // Fetch khi user đã đăng nhập (cả lúc login lẫn lúc refresh trang)
   useEffect(() => {
     if (!isAuthenticated) return;
     setLoading(true);

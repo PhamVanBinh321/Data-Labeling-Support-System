@@ -4,6 +4,7 @@ from . import views
 urlpatterns = [
     # Projects CRUD
     path('', views.ProjectListCreateView.as_view(), name='project-list-create'),
+    path('my-invitations/', views.MyInvitationsView.as_view(), name='my-invitations'),
     path('<int:pk>/', views.ProjectDetailView.as_view(), name='project-detail'),
     path('<int:pk>/status/', views.ProjectStatusView.as_view(), name='project-status'),
 

@@ -55,6 +55,20 @@ export const projectsApi = {
     await client.delete(`/api/projects/${projectId}/labels/${labelId}/`);
   },
 
+  // Invitations (for annotator/reviewer)
+  myInvitations: async () => {
+    const res = await client.get('/api/projects/my-invitations/');
+    return res.data.data as Array<{
+      id: number;
+      project_id: number;
+      project_name: string;
+      project_type: string;
+      role: string;
+      status: string;
+      invited_at: string;
+    }>;
+  },
+
   // Members
   listMembers: async (projectId: number) => {
     const res = await client.get(`/api/projects/${projectId}/members/`);

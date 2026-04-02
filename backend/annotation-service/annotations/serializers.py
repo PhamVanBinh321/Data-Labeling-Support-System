@@ -1,5 +1,3 @@
-import os
-from django.conf import settings
 from rest_framework import serializers
 from PIL import Image as PILImage
 
@@ -60,39 +58,47 @@ class ImageUploadSerializer(serializers.Serializer):
 
     def save_image(self, index: int) -> ImageFile:
         """
-        Lưu file vào disk, đọc kích thước ảnh, tạo ImageFile record.
+        Upload file lên MinIO, đọc kích thước ảnh từ memory, tạo ImageFile record.
         Nếu task_id=None → lưu vào project pool (chưa assign task).
         """
+        import io as _io
+        from annotations.storage import upload_file, ensure_bucket_exists
+
         file = self.validated_data['file']
-        task_id = self.validated_data.get('task_id')  # Có thể None
+        task_id = self.validated_data.get('task_id')
         project_id = self.validated_data['project_id']
         dataset_id = self.validated_data.get('dataset_id')
 
-        # Tạo đường dẫn: tasks/<task_id>/ hoặc projects/<project_id>/unassigned/
-        if task_id:
-            relative_path = f'tasks/{task_id}/{index}_{file.name}'
-        else:
-            relative_path = f'projects/{project_id}/unassigned/{index}_{file.name}'
-        abs_path = os.path.join(settings.MEDIA_ROOT, relative_path)
+        # Đọc toàn bộ file vào memory một lần
+        file_bytes = file.read()
 
-        os.makedirs(os.path.dirname(abs_path), exist_ok=True)
-        with open(abs_path, 'wb') as dest:
-            for chunk in file.chunks():
-                dest.write(chunk)
-
-        # Đọc width/height
+        # Đọc width/height từ memory (không cần ghi ra disk)
         try:
-            with PILImage.open(abs_path) as img:
+            with PILImage.open(_io.BytesIO(file_bytes)) as img:
                 width, height = img.size
         except Exception:
             width, height = 0, 0
+
+        # Object name trong MinIO (giữ cấu trúc path như cũ)
+        if task_id:
+            object_name = f'tasks/{task_id}/{index}_{file.name}'
+        else:
+            object_name = f'projects/{project_id}/unassigned/{index}_{file.name}'
+
+        # Detect content type
+        ext = file.name.rsplit('.', 1)[-1].lower()
+        content_type = {'jpg': 'image/jpeg', 'jpeg': 'image/jpeg', 'png': 'image/png',
+                        'gif': 'image/gif', 'webp': 'image/webp'}.get(ext, 'application/octet-stream')
+
+        ensure_bucket_exists()
+        upload_file(object_name, file_bytes, content_type)
 
         return ImageFile.objects.create(
             task_id=task_id,
             project_id=project_id,
             dataset_id=dataset_id,
             index=index,
-            file_path=relative_path,
+            file_path=object_name,
             original_filename=file.name,
             width=width,
             height=height,
@@ -180,8 +186,8 @@ class AnnotationUpdateSerializer(serializers.Serializer):
 class BulkAnnotationItemSerializer(serializers.Serializer):
     """Một item trong bulk save — không cần image_id (lấy từ URL)."""
 
-    label_id = serializers.CharField(max_length=100)
-    label_name = serializers.CharField(max_length=100)
+    label_id = serializers.CharField(max_length=100, allow_blank=True, default='')
+    label_name = serializers.CharField(max_length=100, allow_blank=True, default='')
     label_color = serializers.CharField(max_length=7)
     annotation_type = serializers.ChoiceField(
         choices=Annotation.AnnotationType.choices,

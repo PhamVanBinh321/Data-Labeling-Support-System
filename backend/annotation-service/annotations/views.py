@@ -1,5 +1,7 @@
 import csv
+import io
 import json
+import zipfile
 import requests
 from io import StringIO
 
@@ -83,6 +85,14 @@ class ImageUploadView(APIView):
 
         task_id    = serializer.validated_data.get('task_id')
         project_id = serializer.validated_data['project_id']
+        filename   = serializer.validated_data['file'].name
+
+        # Chặn upload trùng tên trong cùng project
+        if ImageFile.objects.filter(project_id=project_id, original_filename=filename).exists():
+            return error_response(
+                f'Ảnh "{filename}" đã tồn tại trong project này.',
+                status=400,
+            )
 
         # Xác định index tiếp theo (theo task hoặc project pool)
         if task_id:
@@ -135,7 +145,11 @@ class ImageDetailView(APIView):
         if request.user.role not in ('manager',) and image.is_confirmed:
             return error_response('Không thể xóa ảnh đã được confirm.', status=400)
 
+        file_path = image.file_path
         image.delete()
+        # Xóa file trên MinIO sau khi xóa DB record
+        from annotations.storage import delete_file
+        delete_file(file_path)
         return success_response(message='Đã xóa ảnh.')
 
 
@@ -333,7 +347,7 @@ class TaskImagesWithAnnotationsView(APIView):
 
 class TaskExportView(APIView):
     """
-    GET /api/annotations/tasks/<task_id>/export/?format=coco|yolo|csv
+    GET /api/annotations/tasks/<task_id>/export/?export_format=coco|yolo|csv
 
     Export toàn bộ annotations của task ra file download.
     - coco  → JSON theo COCO format
@@ -343,9 +357,9 @@ class TaskExportView(APIView):
     permission_classes = [IsAuthenticated, IsAnnotatorOrReviewerOrManager]
 
     def get(self, request, task_id):
-        fmt = request.query_params.get('format', 'coco').lower()
+        fmt = request.query_params.get('export_format', 'coco').lower()
         if fmt not in ('coco', 'yolo', 'csv'):
-            return error_response('format phải là coco, yolo hoặc csv.', status=400)
+            return error_response('export_format phải là coco, yolo hoặc csv.', status=400)
 
         images = ImageFile.objects.filter(task_id=task_id).prefetch_related('annotations').order_by('index')
         if not images.exists():
@@ -403,24 +417,39 @@ class TaskExportView(APIView):
         return response
 
     def _export_yolo(self, task_id, images):
-        result = {}
+        # Build class list from all annotations in task
+        class_names = []
+        class_index = {}
         for image in images:
-            if image.width == 0 or image.height == 0:
-                continue
-            lines = []
             for ann in image.annotations.all():
-                cx = (ann.x + ann.width / 2) / image.width
-                cy = (ann.y + ann.height / 2) / image.height
-                w = ann.width / image.width
-                h = ann.height / image.height
-                lines.append(f'0 {cx:.6f} {cy:.6f} {w:.6f} {h:.6f}')
-            result[image.original_filename] = '\n'.join(lines)
+                if ann.label_name not in class_index:
+                    class_index[ann.label_name] = len(class_names)
+                    class_names.append(ann.label_name)
 
-        response = HttpResponse(
-            json.dumps(result, ensure_ascii=False, indent=2),
-            content_type='application/json',
-        )
-        response['Content-Disposition'] = f'attachment; filename="task_{task_id}_yolo.json"'
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
+            # classes.txt
+            zf.writestr('classes.txt', '\n'.join(class_names))
+
+            for image in images:
+                if image.width == 0 or image.height == 0:
+                    continue
+                lines = []
+                for ann in image.annotations.all():
+                    cls_idx = class_index.get(ann.label_name, 0)
+                    cx = (ann.x + ann.width / 2) / image.width
+                    cy = (ann.y + ann.height / 2) / image.height
+                    w = ann.width / image.width
+                    h = ann.height / image.height
+                    lines.append(f'{cls_idx} {cx:.6f} {cy:.6f} {w:.6f} {h:.6f}')
+
+                # tên file .txt = tên ảnh không có extension
+                base_name = image.original_filename.rsplit('.', 1)[0]
+                zf.writestr(f'{base_name}.txt', '\n'.join(lines))
+
+        buf.seek(0)
+        response = HttpResponse(buf.read(), content_type='application/zip')
+        response['Content-Disposition'] = f'attachment; filename="task_{task_id}_yolo.zip"'
         return response
 
     def _export_csv(self, task_id, images):
@@ -492,12 +521,20 @@ class ProjectAssignImagesView(APIView):
             return error_response('count phải lớn hơn 0.', status=400)
 
         # Lấy N ảnh chưa assign theo thứ tự index
-        unassigned = ImageFile.objects.filter(
+        available = ImageFile.objects.filter(
             project_id=project_id, task_id__isnull=True
-        ).order_by('index')[:count]
+        ).order_by('index')
 
-        if not unassigned:
-            return error_response('Không có ảnh nào trong project pool.', status=400)
+        available_count = available.count()
+        if available_count == 0:
+            return error_response('Không có ảnh nào trong project pool chưa được phân công.', status=400)
+        if available_count < count:
+            return error_response(
+                f'Chỉ còn {available_count} ảnh chưa được phân công, không đủ để tạo task {count} ảnh.',
+                status=400,
+            )
+
+        unassigned = available[:count]
 
         # Assign vào task, cập nhật index theo thứ tự trong task
         task_last = ImageFile.objects.filter(task_id=task_id).order_by('-index').first()

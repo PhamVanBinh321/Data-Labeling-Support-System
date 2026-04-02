@@ -6,7 +6,9 @@ import Topbar from '../components/Topbar';
 import './DashboardLayout.css';
 
 const DashboardLayout: React.FC = () => {
-  const { isAuthenticated, activeRole } = useAuth();
+  const { isAuthenticated, activeRole, loading } = useAuth();
+
+  if (loading) return null; // Wait for auth check before redirecting
 
   // If not logged in, redirect to login
   if (!isAuthenticated) {

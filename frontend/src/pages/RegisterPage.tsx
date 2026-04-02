@@ -1,16 +1,28 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Mail, Lock, User, Github } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import toast from 'react-hot-toast';
 
 const RegisterPage: React.FC = () => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const { register } = useAuth();
+  const navigate = useNavigate();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Handle registration logic here
-    console.log('Register attempt with:', { name, email });
+    setSubmitting(true);
+    try {
+      await register(name, email, password);
+      navigate('/role-selection');
+    } catch {
+      toast.error('Đăng ký thất bại. Email có thể đã được sử dụng.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -72,8 +84,8 @@ const RegisterPage: React.FC = () => {
           </div>
         </div>
 
-        <button type="submit" className="btn btn-primary auth-btn">
-          Tạo tài khoản miễn phí
+        <button type="submit" className="btn btn-primary auth-btn" disabled={submitting}>
+          {submitting ? 'Đang đăng ký...' : 'Tạo tài khoản miễn phí'}
         </button>
       </form>
 

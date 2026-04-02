@@ -2,7 +2,7 @@
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
-  max-width: 860px;
+  width: 100%;
 }
 
 .page-title {
@@ -16,10 +16,11 @@
 .stepper {
   display: flex;
   align-items: center;
-  gap: 0;
+  justify-content: center;
+  gap: 2rem;
   background: white;
   border-radius: 12px;
-  padding: 1.5rem 2rem;
+  padding: 1.25rem 2rem;
   box-shadow: 0 1px 3px rgba(0,0,0,.08);
 }
 
@@ -27,7 +28,6 @@
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  flex-shrink: 0;
 }
 
 .step-circle {
@@ -69,17 +69,6 @@
   color: #1e293b;
 }
 
-.step-connector {
-  flex: 1;
-  height: 2px;
-  background: #e2e8f0;
-  margin: 0 1rem;
-  transition: background .25s;
-}
-
-.step-connector.done {
-  background: #10b981;
-}
 
 /* ── Form Card ── */
 .form-card {

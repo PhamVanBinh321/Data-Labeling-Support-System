@@ -170,7 +170,9 @@ const ProjectDetails: React.FC = () => {
 
   const handleUpload = async () => {
     setUploading(true);
-    let success = 0, failed = 0;
+    let success = 0;
+    const duplicates: string[] = [];
+    const errors: string[] = [];
     for (const file of importFiles) {
       const fd = new FormData();
       fd.append('project_id', project.id);
@@ -178,12 +180,17 @@ const ProjectDetails: React.FC = () => {
       try {
         await annotationsApi.uploadImage(fd);
         success++;
-      } catch { failed++; }
+      } catch (err: any) {
+        const msg: string = err?.response?.data?.message ?? '';
+        if (msg.includes('đã tồn tại')) duplicates.push(file.name);
+        else errors.push(file.name);
+      }
     }
     setUploading(false);
     setImportFiles([]);
-    if (failed === 0) toast.success(`Upload ${success} ảnh vào project thành công!`);
-    else toast(`Upload xong: ${success} thành công, ${failed} thất bại.`, { icon: '⚠️' });
+    if (success > 0) toast.success(`Upload ${success} ảnh thành công!`);
+    if (duplicates.length > 0) toast.error(`${duplicates.length} ảnh trùng tên đã bị bỏ qua: ${duplicates.join(', ')}`);
+    if (errors.length > 0) toast.error(`${errors.length} ảnh upload thất bại.`);
   };
 
   const handleExport = async (format: 'coco' | 'yolo' | 'csv') => {
@@ -191,8 +198,11 @@ const ProjectDetails: React.FC = () => {
     setExporting(true);
     try {
       const response = await annotationsApi.exportTask(Number(exportTaskId), format);
-      const ext  = format === 'coco' ? 'json' : format === 'yolo' ? 'zip' : 'csv';
-      const url  = window.URL.createObjectURL(new Blob([response.data]));
+      const ext      = format === 'coco' ? 'json' : format === 'yolo' ? 'zip' : 'csv';
+      const mimeType = format === 'coco' ? 'application/json'
+                     : format === 'yolo' ? 'application/zip'
+                     : 'text/csv';
+      const url  = window.URL.createObjectURL(new Blob([response.data], { type: mimeType }));
       const link = document.createElement('a');
       link.href = url;
       link.setAttribute('download', `task_${exportTaskId}_${format}.${ext}`);
