@@ -69,11 +69,17 @@ const LabelingWorkspace: React.FC = () => {
   }, [task?.projectId]);
 
   // ── Auto-transition pending/rejected → in-progress khi mở workspace ──
+  const autoTransitioned = useRef(false);
   useEffect(() => {
-    if ((task?.status === 'pending' || task?.status === 'rejected') && !isReviewer) {
+    // Guard: chỉ chạy cho đúng task được yêu cầu, không dùng fallback tasks[0]
+    if (!task || task.id !== taskId) return;
+    // Guard: chỉ chạy 1 lần duy nhất (tránh React Strict Mode double-fire)
+    if (autoTransitioned.current) return;
+    if ((task.status === 'pending' || task.status === 'rejected') && !isReviewer) {
+      autoTransitioned.current = true;
       updateTaskStatus(task.id, 'in-progress').catch(() => {});
     }
-  }, [task?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [task?.id, task?.status]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── API images state ──
   const [apiImages, setApiImages] = useState<any[]>([]);

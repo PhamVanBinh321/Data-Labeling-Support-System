@@ -2,6 +2,8 @@ import React, { createContext, useState, useContext, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import { authApi } from '../api/auth';
 import type { AuthUser } from '../api/auth';
+import { notificationsApi } from '../api/notifications';
+import { requestFcmToken, onForegroundMessage } from '../firebase/messaging';
 
 // Định nghĩa các Role có trong hệ thống
 export type Role = 'manager' | 'annotator' | 'reviewer' | null;
@@ -21,18 +23,35 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(
-    () => !!localStorage.getItem('access_token')
+    () => !!sessionStorage.getItem('access_token')
   );
   const [user, setUser] = useState<AuthUser | null>(null);
   const [activeRole, setActiveRole] = useState<Role>(() => {
-    const storedRole = localStorage.getItem('annotate_pro_role');
+    const storedRole = sessionStorage.getItem('annotate_pro_role');
     return (storedRole as Role) || null;
   });
   const [loading, setLoading] = useState<boolean>(true);
 
+  const _registerFcmToken = async () => {
+    const token = await requestFcmToken();
+    if (token) notificationsApi.registerFcmToken(token).catch(() => {});
+  };
+
+  // Lắng nghe foreground notification — chỉ hiện nếu đúng recipient
+  useEffect(() => {
+    const unsubscribe = onForegroundMessage(({ title, body, recipientId }) => {
+      // Nếu có recipient_id thì kiểm tra, không thì hiện cho mọi user
+      const isRecipient = recipientId === null || recipientId === user?.id;
+      if (isRecipient && Notification.permission === 'granted') {
+        new Notification(title, { body, icon: '/vite.svg' });
+      }
+    });
+    return unsubscribe;
+  }, [user?.id]);
+
   // Khởi động: load user từ token đã lưu
   useEffect(() => {
-    const token = localStorage.getItem('access_token');
+    const token = sessionStorage.getItem('access_token');
     if (!token) {
       setLoading(false);
       return;
@@ -43,7 +62,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setIsAuthenticated(true);
         if (u.role) {
           setActiveRole(u.role as Role);
-          localStorage.setItem('annotate_pro_role', u.role);
+          sessionStorage.setItem('annotate_pro_role', u.role);
         }
       })
       .catch(() => {
@@ -55,32 +74,34 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const login = async (email: string, password: string) => {
     const data = await authApi.login(email, password);
-    localStorage.setItem('access_token', data.access_token);
-    localStorage.setItem('refresh_token', data.refresh_token);
+    sessionStorage.setItem('access_token', data.access_token);
+    sessionStorage.setItem('refresh_token', data.refresh_token);
     setUser(data.user);
     setIsAuthenticated(true);
     if (data.user.role) {
       setActiveRole(data.user.role as Role);
-      localStorage.setItem('annotate_pro_role', data.user.role);
+      sessionStorage.setItem('annotate_pro_role', data.user.role);
     }
+    _registerFcmToken();
   };
 
   const register = async (name: string, email: string, password: string) => {
     const data = await authApi.register(name, email, password);
-    localStorage.setItem('access_token', data.access_token);
-    localStorage.setItem('refresh_token', data.refresh_token);
+    sessionStorage.setItem('access_token', data.access_token);
+    sessionStorage.setItem('refresh_token', data.refresh_token);
     setUser(data.user);
     setIsAuthenticated(true);
+    _registerFcmToken();
   };
 
   const logout = async () => {
-    const refreshToken = localStorage.getItem('refresh_token');
+    const refreshToken = sessionStorage.getItem('refresh_token');
     if (refreshToken) {
       try { await authApi.logout(refreshToken); } catch { /* ignore */ }
     }
-    localStorage.removeItem('access_token');
-    localStorage.removeItem('refresh_token');
-    localStorage.removeItem('annotate_pro_role');
+    sessionStorage.removeItem('access_token');
+    sessionStorage.removeItem('refresh_token');
+    sessionStorage.removeItem('annotate_pro_role');
     setIsAuthenticated(false);
     setActiveRole(null);
     setUser(null);
@@ -91,7 +112,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const updatedUser = await authApi.setRole(role);
     setUser(updatedUser);
     setActiveRole(role);
-    localStorage.setItem('annotate_pro_role', role);
+    sessionStorage.setItem('annotate_pro_role', role);
   };
 
   return (

@@ -7,7 +7,7 @@ from .models import Notification
 from .serializers import NotificationSerializer, CreateNotificationSerializer, BulkCreateNotificationSerializer
 from .permissions import IsAnyRole, IsInternalService
 from .utils import success_response, error_response
-from .cache import get_unread_count, set_unread_count, invalidate_unread_count
+from .cache import get_unread_count, set_unread_count, invalidate_unread_count, save_fcm_token
 
 
 # ─── PAGINATION ───────────────────────────────────────────────────────────────
@@ -129,6 +129,24 @@ class NotificationDeleteView(APIView):
         notif.delete()
         invalidate_unread_count(request.user.id)
         return success_response(message='Đã xóa notification.')
+
+
+# ─── FCM TOKEN ───────────────────────────────────────────────────────────────
+
+class FcmTokenView(APIView):
+    """
+    POST /api/notify/fcm-token/
+    Body: { token: "<FCM registration token>" }
+    Frontend gọi sau khi xin permission và nhận được token từ Firebase SDK.
+    """
+    permission_classes = [IsAuthenticated, IsAnyRole]
+
+    def post(self, request):
+        token = request.data.get('token', '').strip()
+        if not token:
+            return error_response('Thiếu FCM token.', status=400)
+        save_fcm_token(request.user.id, token)
+        return success_response(message='Đã lưu FCM token.')
 
 
 # ─── INTERNAL API VIEWS ───────────────────────────────────────────────────────

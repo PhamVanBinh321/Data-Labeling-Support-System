@@ -24,4 +24,8 @@ export const notificationsApi = {
   delete: async (id: number) => {
     await client.delete(`/api/notify/${id}/`);
   },
+
+  registerFcmToken: async (token: string) => {
+    await client.post('/api/notify/fcm-token/', { token });
+  },
 };

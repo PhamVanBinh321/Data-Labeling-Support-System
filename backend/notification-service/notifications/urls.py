@@ -10,6 +10,9 @@ urlpatterns = [
     path('<int:pk>/', views.NotificationDeleteView.as_view()),
 
     # ── Internal APIs (header: X-Internal-Service: true, không cần JWT) ───────
+    path('fcm-token/', views.FcmTokenView.as_view()),
+
+    # ── Internal APIs (header: X-Internal-Service: true, không cần JWT) ───────
     path('internal/', views.InternalCreateNotificationView.as_view()),
     path('internal/bulk/', views.InternalBulkCreateNotificationView.as_view()),
 ]

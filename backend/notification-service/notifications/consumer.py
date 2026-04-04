@@ -39,7 +39,8 @@ def _handle_message(channel, method, properties, body):
 
         # Import ở đây để đảm bảo Django đã setup
         from notifications.models import Notification
-        from notifications.cache import invalidate_unread_count
+        from notifications.cache import invalidate_unread_count, get_fcm_token
+        from notifications.firebase import send_push
 
         Notification.objects.create(
             recipient_id=recipient_id,
@@ -50,6 +51,11 @@ def _handle_message(channel, method, properties, body):
             project_id=project_id,
         )
         invalidate_unread_count(recipient_id)
+
+        # Gửi FCM push nếu user đã đăng ký token
+        fcm_token = get_fcm_token(recipient_id)
+        if fcm_token:
+            send_push(fcm_token, title, message, recipient_id=recipient_id)
 
         logger.info('Tạo notification %s cho user %s', notif_type, recipient_id)
         channel.basic_ack(delivery_tag=method.delivery_tag)

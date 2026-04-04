@@ -1,0 +1,3 @@
+# Firebase credentials — không commit private key
+**/firebase-credentials.json
+**/*adminsdk*.json
