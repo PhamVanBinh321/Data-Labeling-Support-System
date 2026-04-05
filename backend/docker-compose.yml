@@ -41,6 +41,65 @@ services:
       retries: 5
     restart: unless-stopped
 
+  # ─── APACHE NIFI ─────────────────────────────────────────────────────────
+  nifi:
+    build:
+      context: ./nifi
+      dockerfile: Dockerfile
+    container_name: dlss_nifi
+    ports:
+      - "8443:8443"
+    environment:
+      SINGLE_USER_CREDENTIALS_USERNAME: admin
+      SINGLE_USER_CREDENTIALS_PASSWORD: adminpassword123
+      NIFI_WEB_HTTPS_HOST: 0.0.0.0
+      NIFI_WEB_HTTPS_PORT: 8443
+    volumes:
+      - nifi_data:/opt/nifi/nifi-current/data
+    networks:
+      - dlss_network
+    restart: unless-stopped
+
+  # ─── REPORTING DB (NiFi ghi vào, admin-service đọc ra) ───────────────────
+  reporting-db:
+    image: postgres:16-alpine
+    container_name: dlss_reporting_db
+    environment:
+      POSTGRES_DB: reporting_db
+      POSTGRES_USER: reporting_user
+      POSTGRES_PASSWORD: reporting_pass
+    volumes:
+      - reporting_db_data:/var/lib/postgresql/data
+      - ./reporting-db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - dlss_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U reporting_user -d reporting_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ─── ADMIN SERVICE ────────────────────────────────────────────────────────
+  admin-service:
+    build:
+      context: ./admin-service
+      dockerfile: Dockerfile
+    container_name: dlss_admin
+    ports:
+      - "8006:8006"
+    env_file: ./admin-service/.env
+    environment:
+      - DATABASE_URL=postgresql://reporting_user:reporting_pass@reporting-db:5432/reporting_db
+    volumes:
+      - ./admin-service:/app
+    depends_on:
+      reporting-db:
+        condition: service_healthy
+    networks:
+      - dlss_network
+    restart: unless-stopped
+
   # ─── MINIO OBJECT STORAGE ────────────────────────────────────────────────
   minio:
     image: minio/minio:latest
@@ -77,6 +136,7 @@ services:
       - task-service
       - annotation-service
       - notification-service
+      - admin-service
     networks:
       - dlss_network
     restart: unless-stopped
@@ -333,6 +393,8 @@ volumes:
   minio_data:
   redis_data:
   rabbitmq_data:
+  nifi_data:
+  reporting_db_data:
 
 # ─── NETWORKS ───────────────────────────────────────────────────────────────
 networks:
