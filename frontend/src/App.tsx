@@ -15,6 +15,7 @@ import LabelingWorkspace from './pages/annotator/LabelingWorkspace';
 import AnnotatorPerformance from './pages/annotator/AnnotatorPerformance';
 import ReviewerQueue from './pages/reviewer/ReviewerQueue';
 import QualityMetrics from './pages/reviewer/QualityMetrics';
+import AdminDashboard from './pages/admin/AdminDashboard';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { DataProvider } from './context/DataContext';
 import { Navigate } from 'react-router-dom';
@@ -77,6 +78,8 @@ function App() {
               <Route path="/reviewer/queue" element={<ReviewerQueue />} />
               <Route path="/reviewer/metrics" element={<QualityMetrics />} />
               <Route path="/reviewer/*" element={<ReviewerQueue />} />
+              <Route path="/admin" element={<AdminDashboard />} />
+              <Route path="/admin/*" element={<AdminDashboard />} />
             </Route>
 
           </Routes>

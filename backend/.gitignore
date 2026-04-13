@@ -1,3 +1,8 @@
 # Firebase credentials — không commit private key
 **/firebase-credentials.json
 **/*adminsdk*.json
+
+# Environment files — chứa secrets, không commit
+**/.env
+**/.env.production
+**/.env.local

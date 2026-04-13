@@ -6,7 +6,7 @@ import { notificationsApi } from '../api/notifications';
 import { requestFcmToken, onForegroundMessage } from '../firebase/messaging';
 
 // Định nghĩa các Role có trong hệ thống
-export type Role = 'manager' | 'annotator' | 'reviewer' | null;
+export type Role = 'manager' | 'annotator' | 'reviewer' | 'admin' | null;
 
 interface AuthContextType {
   isAuthenticated: boolean;

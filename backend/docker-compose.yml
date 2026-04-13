@@ -91,8 +91,6 @@ services:
     env_file: ./admin-service/.env
     environment:
       - DATABASE_URL=postgresql://reporting_user:reporting_pass@reporting-db:5432/reporting_db
-    volumes:
-      - ./admin-service:/app
     depends_on:
       reporting-db:
         condition: service_healthy
@@ -153,8 +151,6 @@ services:
       - REDIS_URL=redis://redis:6379/0
     ports:
       - "8001:8001"
-    volumes:
-      - ./auth-service:/app
     depends_on:
       auth-db:
         condition: service_healthy
@@ -193,8 +189,6 @@ services:
       - DATABASE_URL=postgresql://project_user:project_pass@project-db:5432/project_db
       - AUTH_SERVICE_URL=http://auth-service:8001
       - RABBITMQ_URL=amqp://dlss:dlss_pass@rabbitmq:5672/
-    volumes:
-      - ./project-service:/app
     depends_on:
       project-db:
         condition: service_healthy
@@ -236,8 +230,6 @@ services:
       - AUTH_SERVICE_URL=http://auth-service:8001
       - NOTIFICATION_SERVICE_URL=http://notification-service:8005
       - RABBITMQ_URL=amqp://dlss:dlss_pass@rabbitmq:5672/
-    volumes:
-      - ./task-service:/app
     depends_on:
       task-db:
         condition: service_healthy
@@ -282,10 +274,9 @@ services:
       - MINIO_ACCESS_KEY=minioadmin
       - MINIO_SECRET_KEY=minioadmin
       - MINIO_BUCKET=dlss-media
-      - MINIO_PUBLIC_HOST=http://localhost:9000
+      # MINIO_PUBLIC_HOST: URL công khai để client truy cập file
+      # Đặt trong annotation-service/.env: MINIO_PUBLIC_HOST=http://<VPS_IP>:9000
       - MINIO_USE_SSL=False
-    volumes:
-      - ./annotation-service:/app
     depends_on:
       annotation-db:
         condition: service_healthy
@@ -327,8 +318,6 @@ services:
       - AUTH_SERVICE_URL=http://auth-service:8001
       - REDIS_URL=redis://redis:6379/1
       - RABBITMQ_URL=amqp://dlss:dlss_pass@rabbitmq:5672/
-    volumes:
-      - ./notification-service:/app
     depends_on:
       notification-db:
         condition: service_healthy
@@ -352,8 +341,6 @@ services:
       - AUTH_SERVICE_URL=http://auth-service:8001
       - REDIS_URL=redis://redis:6379/1
       - RABBITMQ_URL=amqp://dlss:dlss_pass@rabbitmq:5672/
-    volumes:
-      - ./notification-service:/app
     depends_on:
       notification-db:
         condition: service_healthy

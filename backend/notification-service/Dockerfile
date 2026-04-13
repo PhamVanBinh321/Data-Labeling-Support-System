@@ -18,4 +18,4 @@ RUN adduser --disabled-password --gecos '' appuser && chown -R appuser /app
 USER appuser
 
 EXPOSE 8005
-CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8005", "--workers", "2", "--reload"]
+CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8005", "--workers", "2", "--timeout", "120"]

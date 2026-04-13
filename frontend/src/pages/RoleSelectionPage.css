@@ -110,6 +110,10 @@
 .role-green:hover .role-icon-wrapper { background-color: #ecfdf5; }
 .role-green:hover .role-btn { background-color: #10b981; color: white; }
 
+.role-red:hover { border-color: #ef4444; }
+.role-red:hover .role-icon-wrapper { background-color: #fef2f2; }
+.role-red:hover .role-btn { background-color: #ef4444; color: white; }
+
 @media (max-width: 900px) {
   .role-cards {
     grid-template-columns: repeat(2, 1fr);

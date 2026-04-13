@@ -1,15 +1,16 @@
 import React from 'react';
 import { NavLink, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { 
-  Briefcase, 
-  Database, 
-  Users, 
-  Settings, 
-  CheckSquare, 
-  BarChart, 
+import {
+  Briefcase,
+  Database,
+  Users,
+  Settings,
+  CheckSquare,
+  BarChart,
   ListTodo,
-  ShieldCheck
+  ShieldCheck,
+  LayoutDashboard
 } from 'lucide-react';
 
 const Sidebar: React.FC = () => {
@@ -63,6 +64,13 @@ const Sidebar: React.FC = () => {
               <span>Quality Metrics</span>
             </NavLink>
           </>
+        );
+      case 'admin':
+        return (
+          <NavLink to="/admin" className={({isActive}) => `nav-item ${isActive ? 'active' : ''}`}>
+            <LayoutDashboard size={20} />
+            <span>Dashboard</span>
+          </NavLink>
         );
       default:
         return null;
