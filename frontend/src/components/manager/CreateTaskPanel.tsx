@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, ChevronRight, AlertTriangle, Users, Calendar, Image } from 'lucide-react';
-import type { Project, Task } from '../../data/mockData';
+import type { Project } from '../../data/mockData';
 import toast from 'react-hot-toast';
 import './CreateTaskPanel.css';
 import { tasksApi } from '../../api/tasks';
@@ -11,7 +11,6 @@ interface ApiMember { id: number; user_id: number; role: string; status: string;
 
 interface CreateTaskPanelProps {
   project: Project;
-  existingTasks: Task[];
   onClose: () => void;
   onSubmit: () => void | Promise<void>;
 }
@@ -23,7 +22,7 @@ const PRIORITY_OPTIONS = [
 ];
 
 
-const CreateTaskPanel: React.FC<CreateTaskPanelProps> = ({ project, existingTasks, onClose, onSubmit }) => {
+const CreateTaskPanel: React.FC<CreateTaskPanelProps> = ({ project, onClose, onSubmit }) => {
   const [form, setForm] = useState({
     name: '',
     imageFrom: 1,

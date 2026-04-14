@@ -1,6 +1,6 @@
 import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
 import type { ReactNode } from 'react';
-import { MOCK_TASKS, MOCK_PROJECTS, MOCK_USERS } from '../data/mockData';
+import { MOCK_USERS } from '../data/mockData';
 import type { Task, Project, User, TaskStatus } from '../data/mockData';
 import { tasksApi } from '../api/tasks';
 import { projectsApi } from '../api/projects';

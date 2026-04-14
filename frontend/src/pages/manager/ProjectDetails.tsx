@@ -747,7 +747,6 @@ const ProjectDetails: React.FC = () => {
       {showCreateTask && (
         <CreateTaskPanel
           project={project}
-          existingTasks={tasks}
           onClose={() => setShowCreateTask(false)}
           onSubmit={async () => { await refreshTasks(); setShowCreateTask(false); }}
         />

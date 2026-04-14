@@ -15,7 +15,7 @@ import { projectsApi } from '../../api/projects';
 import TaskReviewModal from '../../components/reviewer/TaskReviewModal';
 import './LabelingWorkspace.css';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+
 
 
 
