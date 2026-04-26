@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Mail, Lock, User, Github } from 'lucide-react';
+import { Mail, Lock, User } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
 
@@ -89,13 +89,7 @@ const RegisterPage: React.FC = () => {
         </button>
       </form>
 
-      <div className="social-login">
-        <div className="separator"><span>Hoặc đăng ký bằng</span></div>
-        <button className="social-btn" type="button">
-          <Github size={20} />
-          Tiếp tục với GitHub
-        </button>
-      </div>
+
 
       <p className="auth-footer">
         Đã có tài khoản? <Link to="/login" className="auth-link">Đăng nhập</Link>
