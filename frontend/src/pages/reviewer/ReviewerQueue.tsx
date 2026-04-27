@@ -6,6 +6,7 @@ import StatusBadge from '../../components/common/StatusBadge';
 import type { StatusType } from '../../components/common/StatusBadge';
 import toast from 'react-hot-toast';
 import { useData } from '../../context/DataContext';
+import { useAuth } from '../../context/AuthContext';
 import { projectsApi } from '../../api/projects';
 import './ReviewerQueue.css';
 
@@ -29,6 +30,7 @@ interface ReviewTask {
 
 const ReviewerQueue: React.FC = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { tasks, getProjectById, getUserById, updateTaskStatus } = useData();
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -167,6 +169,17 @@ const ReviewerQueue: React.FC = () => {
   return (
     <div className="reviewer-queue-page animate-fade-in">
       <div className="page-header-actions">
+        {user && (
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: '8px',
+            background: '#f8fafc', border: '1px solid #e2e8f0',
+            borderRadius: '8px', padding: '6px 12px',
+            fontSize: '0.85rem', color: '#475569',
+          }}>
+            <span style={{ fontWeight: 500 }}>Reviewer ID:</span>
+            <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#1e293b' }}>{user.id}</span>
+          </div>
+        )}
         <div className="search-filter-group">
           <div className="search-box">
             <Search size={18} className="search-icon" />

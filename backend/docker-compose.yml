@@ -14,7 +14,7 @@ services:
     networks:
       - dlss_network
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: [ "CMD", "redis-cli", "ping" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -35,7 +35,7 @@ services:
     networks:
       - dlss_network
     healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      test: [ "CMD", "rabbitmq-diagnostics", "ping" ]
       interval: 15s
       timeout: 10s
       retries: 5
@@ -54,8 +54,10 @@ services:
       SINGLE_USER_CREDENTIALS_PASSWORD: adminpassword123
       NIFI_WEB_HTTPS_HOST: 0.0.0.0
       NIFI_WEB_HTTPS_PORT: 8443
+      NIFI_WEB_PROXY_HOST: 103.163.118.227:8443
     volumes:
       - nifi_data:/opt/nifi/nifi-current/data
+      - nifi_conf:/opt/nifi/nifi-current/conf
     networks:
       - dlss_network
     restart: unless-stopped
@@ -74,7 +76,7 @@ services:
     networks:
       - dlss_network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U reporting_user -d reporting_db"]
+      test: [ "CMD-SHELL", "pg_isready -U reporting_user -d reporting_db" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -114,7 +116,7 @@ services:
     networks:
       - dlss_network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      test: [ "CMD", "curl", "-f", "http://localhost:9000/minio/health/live" ]
       interval: 15s
       timeout: 10s
       retries: 5
@@ -172,7 +174,7 @@ services:
     networks:
       - dlss_network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U auth_user -d auth_db"]
+      test: [ "CMD-SHELL", "pg_isready -U auth_user -d auth_db" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -210,7 +212,7 @@ services:
     networks:
       - dlss_network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U project_user -d project_db"]
+      test: [ "CMD-SHELL", "pg_isready -U project_user -d project_db" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -251,7 +253,7 @@ services:
     networks:
       - dlss_network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U task_user -d task_db"]
+      test: [ "CMD-SHELL", "pg_isready -U task_user -d task_db" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -298,7 +300,7 @@ services:
     networks:
       - dlss_network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U annotation_user -d annotation_db"]
+      test: [ "CMD-SHELL", "pg_isready -U annotation_user -d annotation_db" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -364,7 +366,7 @@ services:
     networks:
       - dlss_network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U notify_user -d notify_db"]
+      test: [ "CMD-SHELL", "pg_isready -U notify_user -d notify_db" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -381,9 +383,10 @@ volumes:
   redis_data:
   rabbitmq_data:
   nifi_data:
+  nifi_conf:
   reporting_db_data:
 
-# ─── NETWORKS ───────────────────────────────────────────────────────────────
+    # ─── NETWORKS ───────────────────────────────────────────────────────────────
 networks:
   dlss_network:
     driver: bridge

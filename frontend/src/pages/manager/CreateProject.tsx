@@ -13,17 +13,22 @@ const STEPS = ['Thông tin cơ bản', 'Ontology & Nhãn', 'Hướng dẫn'];
 interface FormData {
   name: string;
   type: ProjectType;
+  dataType: string;
   description: string;
   labels: LabelDefinition[];
   guidelines: string;
 }
 
-const PROJECT_TYPES: { value: ProjectType; label: string; icon: string }[] = [
-  { value: 'bounding_box', label: 'Bounding Box', icon: '⬜' },
-  { value: 'polygon', label: 'Polygon', icon: '⬡' },
-  { value: 'classification', label: 'Classification', icon: '🏷️' },
-  { value: 'segmentation', label: 'Segmentation', icon: '🎨' },
-  { value: 'text_classification', label: 'Text Classification', icon: '💬' },
+const PROJECT_TYPES: { value: ProjectType; label: string; icon: string; available: boolean }[] = [
+  { value: 'bounding_box', label: 'Bounding Box', icon: '⬜', available: true },
+  { value: 'polygon', label: 'Polygon', icon: '⬡', available: false },
+  { value: 'classification', label: 'Classification', icon: '🏷️', available: false },
+  { value: 'segmentation', label: 'Segmentation', icon: '🎨', available: false },
+  { value: 'text_classification', label: 'Text Classification', icon: '💬', available: false },
+];
+
+const DATA_TYPES: { value: string; label: string; icon: string }[] = [
+  { value: 'image', label: 'Hình ảnh', icon: '🖼️' },
 ];
 
 const PRESET_COLORS = ['#ef4444', '#f97316', '#f59e0b', '#10b981', '#3b82f6', '#8b5cf6', '#ec4899', '#14b8a6'];
@@ -38,12 +43,13 @@ const CreateProject: React.FC = () => {
   const [form, setForm] = useState<FormData>({
     name: '',
     type: 'bounding_box',
+    dataType: 'image',
     description: '',
     labels: [{ id: 'new-1', name: 'Object', color: '#ef4444' }],
     guidelines: '',
   });
 
-  const canAdvanceStep1 = form.name.trim() !== '' && form.type;
+  const canAdvanceStep1 = form.name.trim() !== '' && form.type && form.dataType;
   const canAdvanceStep2 = form.labels.length > 0 && form.labels.every(l => l.name.trim() !== '');
 
   const addLabel = () => {
@@ -131,11 +137,28 @@ const CreateProject: React.FC = () => {
                 {PROJECT_TYPES.map(pt => (
                   <div
                     key={pt.value}
-                    className={`type-card ${form.type === pt.value ? 'selected' : ''}`}
-                    onClick={() => setForm({ ...form, type: pt.value })}
+                    className={`type-card ${form.type === pt.value ? 'selected' : ''} ${!pt.available ? 'disabled' : ''}`}
+                    onClick={() => pt.available && setForm({ ...form, type: pt.value })}
+                    title={!pt.available ? 'Đang phát triển' : pt.label}
                   >
                     <span className="type-icon">{pt.icon}</span>
                     <span className="type-label">{pt.label}</span>
+                    {!pt.available && <span className="type-badge-wip">Đang phát triển</span>}
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="form-group">
+              <label>Loại dữ liệu <span className="required">*</span></label>
+              <div className="type-grid">
+                {DATA_TYPES.map(dt => (
+                  <div
+                    key={dt.value}
+                    className={`type-card ${form.dataType === dt.value ? 'selected' : ''}`}
+                    onClick={() => setForm({ ...form, dataType: dt.value })}
+                  >
+                    <span className="type-icon">{dt.icon}</span>
+                    <span className="type-label">{dt.label}</span>
                   </div>
                 ))}
               </div>

@@ -162,6 +162,28 @@
   background-color: rgba(249,115,22,.05);
 }
 
+.type-card.disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+  background-color: #f8fafc;
+  border-color: #e2e8f0;
+}
+
+.type-card.disabled:hover {
+  border-color: #e2e8f0;
+}
+
+.type-badge-wip {
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: #64748b;
+  background: #e2e8f0;
+  border-radius: 4px;
+  padding: 0.15rem 0.4rem;
+  text-align: center;
+  line-height: 1.4;
+}
+
 .type-icon {
   font-size: 1.5rem;
 }

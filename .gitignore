@@ -1,0 +1,9 @@
+# Environment variables - sensitive, do not commit
+backend/**/.env
+backend/*.env
+backend/setup_env.sh
+
+# Node
+node_modules/
+dist/
+.DS_Store
