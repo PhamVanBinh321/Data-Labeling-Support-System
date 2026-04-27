@@ -9,7 +9,7 @@ class IsAnyRole(BasePermission):
         return bool(
             request.user
             and request.user.is_authenticated
-            and request.user.role in ('annotator', 'reviewer', 'manager')
+            and request.user.role in ('annotator', 'reviewer', 'manager', 'admin')
         )
 
 

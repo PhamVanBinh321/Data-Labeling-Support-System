@@ -109,8 +109,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const setRole = async (role: Role) => {
     if (!role) return;
-    const updatedUser = await authApi.setRole(role);
-    setUser(updatedUser);
+    const data = await authApi.setRole(role);
+    sessionStorage.setItem('access_token', data.access_token);
+    sessionStorage.setItem('refresh_token', data.refresh_token);
+    setUser(data.user);
     setActiveRole(role);
     sessionStorage.setItem('annotate_pro_role', role);
   };

@@ -241,8 +241,12 @@ def set_role(request):
     user.role_confirmed = True
     user.save(update_fields=['role', 'role_confirmed', 'updated_at'])
     _invalidate_user(user.id)
+    
+    # Generate new tokens with the updated role
+    token_data = _make_token_data(user)
+    
     return success_response(
-        data=UserSerializer(user).data,
+        data=token_data,
         message=f'Role đã được đặt thành "{user.get_role_display()}".',
     )
 

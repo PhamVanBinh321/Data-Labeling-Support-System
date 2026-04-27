@@ -37,7 +37,7 @@ export const authApi = {
     return res.data.data;
   },
 
-  setRole: async (role: string): Promise<AuthUser> => {
+  setRole: async (role: string): Promise<AuthTokens> => {
     const res = await client.patch('/api/auth/me/role/', { role });
     return res.data.data;
   },
