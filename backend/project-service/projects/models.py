@@ -137,3 +137,24 @@ class Dataset(models.Model):
 
     def __str__(self):
         return f'{self.name} ({self.project.name})'
+
+
+class ProjectSnapshot(models.Model):
+    """
+    Lưu trữ bản sao lưu (snapshot) của một dự án tại một thời điểm.
+    Bao gồm metadata của project, cấu hình labels, và thông tin datasets.
+    """
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='snapshots')
+    snapshot_data = models.JSONField(default=dict)
+    created_at = models.DateTimeField(auto_now_add=True)
+    created_by = models.IntegerField()  # user_id của người tạo snapshot
+
+    class Meta:
+        db_table = 'project_snapshots'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['project', '-created_at']),
+        ]
+
+    def __str__(self):
+        return f'Snapshot of {self.project.name} at {self.created_at}'
