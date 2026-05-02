@@ -4,6 +4,7 @@ from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
+from rest_framework.pagination import PageNumberPagination
 
 from .models import Project, LabelDefinition, ProjectMember, Dataset
 from .permissions import IsManager, IsProjectManager, IsProjectMemberOrManager, IsInternalService
@@ -27,6 +28,12 @@ def _send_notification(recipient_id, notif_type, title, message, task_id, projec
 
 # ─── Projects ─────────────────────────────────────────────────────────────────
 
+class ProjectPagination(PageNumberPagination):
+    page_size = 10
+    page_size_query_param = 'page_size'
+    max_page_size = 100
+
+
 class ProjectListCreateView(APIView):
     """
     GET  /api/projects/  — list projects theo role
@@ -38,17 +45,24 @@ class ProjectListCreateView(APIView):
         user_id = request.user.id
 
         if role == 'manager':
-            qs = Project.objects.filter(manager_id=user_id)
+            qs = Project.objects.filter(manager_id=user_id).order_by('-created_at')
         else:
             # annotator / reviewer: chỉ thấy projects mình là member active
             member_project_ids = ProjectMember.objects.filter(
                 user_id=user_id,
                 status=ProjectMember.Status.ACTIVE,
             ).values_list('project_id', flat=True)
-            qs = Project.objects.filter(id__in=member_project_ids)
+            qs = Project.objects.filter(id__in=member_project_ids).order_by('-created_at')
 
-        serializer = ProjectListSerializer(qs, many=True)
-        return success_response(data=serializer.data)
+        paginator = ProjectPagination()
+        paginated_qs = paginator.paginate_queryset(qs, request, view=self)
+        serializer = ProjectListSerializer(paginated_qs, many=True)
+        return success_response(data={
+            'count': paginator.page.paginator.count,
+            'total_pages': paginator.page.paginator.num_pages,
+            'current_page': paginator.page.number,
+            'results': serializer.data
+        })
 
     def post(self, request):
         if request.user.role != 'manager':
