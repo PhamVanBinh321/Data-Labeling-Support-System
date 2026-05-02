@@ -57,7 +57,7 @@ const LoginPage: React.FC = () => {
         <div className="form-group">
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
             <label htmlFor="password">Mật khẩu</label>
-            <a href="#" className="auth-link" style={{ fontSize: '0.875rem' }}>Quên mật khẩu?</a>
+            <Link to="/forgot-password" className="auth-link" style={{ fontSize: '0.875rem' }}>Quên mật khẩu?</Link>
           </div>
           <div className="input-with-icon" style={{ position: 'relative' }}>
             <Lock size={18} color="#64748b" style={{ position: 'absolute', top: '12px', left: '12px' }} />
