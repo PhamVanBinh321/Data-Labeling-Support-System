@@ -1,6 +1,6 @@
 import re
 from rest_framework import serializers
-from .models import Project, LabelDefinition, ProjectMember, Dataset
+from .models import Project, LabelDefinition, ProjectMember, Dataset, ProjectSnapshot
 
 
 # ─── Label serializers ────────────────────────────────────────────────────────
@@ -183,3 +183,12 @@ class DatasetUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Dataset
         fields = ('status', 'total_files', 'total_size_mb')
+
+
+# ─── Snapshot serializers ─────────────────────────────────────────────────────
+
+class ProjectSnapshotSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProjectSnapshot
+        fields = ('id', 'project_id', 'snapshot_data', 'created_at', 'created_by')
+        read_only_fields = ('id', 'created_at', 'snapshot_data', 'created_by')
