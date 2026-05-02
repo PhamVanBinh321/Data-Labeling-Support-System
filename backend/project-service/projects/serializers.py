@@ -105,6 +105,14 @@ class ProjectStatusSerializer(serializers.Serializer):
                 f'Không thể chuyển từ "{current}" sang "{value}". '
                 f'Các trạng thái hợp lệ: {allowed or "không có"}.'
             )
+
+        if value == Project.Status.COMPLETED:
+            project = self.context['project']
+            if project.total_images == 0:
+                raise serializers.ValidationError('Không thể hoàn thành project khi chưa có dữ liệu ảnh (total_images = 0).')
+            if project.approved_images < project.total_images:
+                raise serializers.ValidationError('Không thể hoàn thành project khi chưa duyệt xong tất cả ảnh.')
+
         return value
 
 
