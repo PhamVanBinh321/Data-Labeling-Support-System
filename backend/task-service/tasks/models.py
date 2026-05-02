@@ -37,6 +37,7 @@ class Task(models.Model):
     completed_images = models.IntegerField(default=0)
 
     # ── Review fields ─────────────────────────────────────────────────────────
+    assigned_at = models.DateTimeField(null=True, blank=True)
     submitted_at = models.DateTimeField(null=True, blank=True)
     quality_score = models.FloatField(null=True, blank=True)
     reject_reason = models.TextField(blank=True, default='')
