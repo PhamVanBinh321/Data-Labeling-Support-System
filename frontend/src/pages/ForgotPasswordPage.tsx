@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Mail, ArrowLeft } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 const ForgotPasswordPage: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -9,7 +10,19 @@ const ForgotPasswordPage: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Logic will be added in the next commit
+    if (!email) return;
+
+    setSubmitting(true);
+    try {
+      // Simulate API call to backend
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+      setSubmitted(true);
+      toast.success('Đã gửi liên kết xác nhận vào email của bạn!');
+    } catch (error) {
+      toast.error('Có lỗi xảy ra, vui lòng thử lại sau.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
