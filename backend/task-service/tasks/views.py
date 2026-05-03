@@ -14,7 +14,9 @@ from .serializers import (
 )
 from .permissions import IsManager, IsAnnotator, IsReviewer, IsAnyRole, IsInternalService
 from .utils import success_response, error_response
+from .utils import success_response, error_response
 from .publisher import publish_notification
+from .services.distribution import round_robin_assign
 
 
 # ─── SERVICE HELPERS ─────────────────────────────────────────────────────────
@@ -176,6 +178,27 @@ class TaskDetailView(APIView):
 
         task.delete()
         return success_response(message='Đã xóa task.')
+
+
+class AutoAssignTaskView(APIView):
+    """
+    POST /api/tasks/auto-assign/
+    Manager tự động chia đều task cho các annotators.
+    Body: { "project_id": 1, "annotator_ids": [2, 3], "task_limit": 10 }
+    """
+    permission_classes = [IsAuthenticated, IsManager]
+
+    def post(self, request):
+        project_id = request.data.get('project_id')
+        annotator_ids = request.data.get('annotator_ids', [])
+        task_limit = request.data.get('task_limit', 10)
+        
+        result = round_robin_assign(project_id, annotator_ids, int(task_limit))
+        
+        return success_response(
+            data=result,
+            message=f'Đã chia thành công {result["assigned_count"]} task.'
+        )
 
 
 # ─── STATE MACHINE + HISTORY ──────────────────────────────────────────────────
