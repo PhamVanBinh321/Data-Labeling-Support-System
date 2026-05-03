@@ -24,7 +24,30 @@ BINDING_KEY = 'notification.#'
 def _handle_message(channel, method, properties, body):
     """Callback xử lý mỗi message nhận được."""
     try:
-        data = json.loads(body)
+        payload = json.loads(body)
+        
+        # Xử lý sự kiện quên mật khẩu từ auth-service
+        event_type = payload.get('event')
+        if event_type == 'forgot_password_requested':
+            event_data = payload.get('data', {})
+            email = event_data.get('email')
+            name = event_data.get('name')
+            reset_link = event_data.get('reset_link')
+            
+            from django.core.mail import send_mail
+            send_mail(
+                subject='Yêu cầu đặt lại mật khẩu - Data Labeling System',
+                message=f'Chào {name},\n\nVui lòng truy cập đường dẫn sau để đặt lại mật khẩu của bạn:\n{reset_link}\n\nĐường dẫn này có hiệu lực trong 15 phút.',
+                from_email=getattr(settings, 'DEFAULT_FROM_EMAIL', 'noreply@dlss.com'),
+                recipient_list=[email],
+                fail_silently=False,
+            )
+            logger.info('Đã gửi email quên mật khẩu cho %s', email)
+            channel.basic_ack(delivery_tag=method.delivery_tag)
+            return
+
+        # Xử lý in-app notification (cũ)
+        data = payload
         recipient_id = data.get('recipient_id')
         notif_type = data.get('type')
         title = data.get('title', '')
@@ -75,10 +98,14 @@ def start_consuming():
     connection = pika.BlockingConnection(params)
     channel = connection.channel()
 
-    # Khai báo exchange + queue + binding (idempotent)
+    # Khai báo exchange + queue + binding (in-app notification)
     channel.exchange_declare(exchange=EXCHANGE, exchange_type='topic', durable=True)
     channel.queue_declare(queue=QUEUE, durable=True)
     channel.queue_bind(queue=QUEUE, exchange=EXCHANGE, routing_key=BINDING_KEY)
+
+    # Lắng nghe thêm event forgot_password từ auth_events
+    channel.exchange_declare(exchange='auth_events', exchange_type='topic', durable=True)
+    channel.queue_bind(queue=QUEUE, exchange='auth_events', routing_key='user.forgot_password')
 
     # Xử lý từng message một (prefetch=1)
     channel.basic_qos(prefetch_count=1)
