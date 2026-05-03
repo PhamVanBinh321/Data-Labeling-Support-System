@@ -6,7 +6,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 from rest_framework.pagination import PageNumberPagination
 
-from .models import Project, LabelDefinition, ProjectMember, Dataset
+from .models import Project, LabelDefinition, ProjectMember, Dataset, ProjectSnapshot
 from .permissions import IsManager, IsProjectManager, IsProjectMemberOrManager, IsInternalService
 from .serializers import (
     ProjectListSerializer, ProjectDetailSerializer,
@@ -14,9 +14,11 @@ from .serializers import (
     LabelDefinitionSerializer, LabelDefinitionCreateSerializer,
     ProjectMemberSerializer, MyInvitationSerializer, InviteMemberSerializer, UpdateMemberStatusSerializer,
     DatasetSerializer, DatasetCreateSerializer, DatasetUpdateSerializer,
+    ProjectSnapshotSerializer,
 )
 from .utils import success_response, error_response
 from .publisher import publish_notification
+from .services.snapshot_builder import generate_snapshot_data
 
 
 # ─── SERVICE HELPERS ─────────────────────────────────────────────────────────
@@ -589,3 +591,37 @@ class InternalDatasetView(APIView):
         except Dataset.DoesNotExist:
             return error_response(message='Dataset không tồn tại.', status=status.HTTP_404_NOT_FOUND)
         return success_response(data=DatasetSerializer(dataset).data)
+
+
+# ─── Snapshots ────────────────────────────────────────────────────────────────
+
+class ProjectSnapshotListCreateView(APIView):
+    """
+    POST /api/projects/{id}/snapshots/  — trigger tạo snapshot
+    """
+
+    def _get_project(self, pk):
+        try:
+            return Project.objects.get(pk=pk)
+        except Project.DoesNotExist:
+            return None
+
+    def post(self, request, pk):
+        project = self._get_project(pk)
+        if project is None:
+            return error_response(message='Project không tồn tại.', status=status.HTTP_404_NOT_FOUND)
+        if project.manager_id != request.user.id:
+            return error_response(message='Bạn không phải Manager của project này.', status=status.HTTP_403_FORBIDDEN)
+        
+        snapshot_data = generate_snapshot_data(project.id)
+        snapshot = ProjectSnapshot.objects.create(
+            project=project,
+            snapshot_data=snapshot_data,
+            created_by=request.user.id
+        )
+        
+        return success_response(
+            data=ProjectSnapshotSerializer(snapshot).data,
+            message='Đã tạo bản sao lưu dữ liệu project.',
+            status=status.HTTP_201_CREATED,
+        )

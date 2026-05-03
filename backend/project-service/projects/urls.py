@@ -17,6 +17,9 @@ urlpatterns = [
     path('<int:pk>/members/<int:mid>/status/', views.MemberStatusView.as_view(), name='member-status'),
     path('<int:pk>/members/<int:mid>/', views.MemberDeleteView.as_view(), name='member-delete'),
 
+    # Snapshots
+    path('<int:pk>/snapshots/', views.ProjectSnapshotListCreateView.as_view(), name='project-snapshots'),
+
     # Internal API (no JWT, header-based auth)
     path('internal/projects/<int:pk>/', views.InternalProjectView.as_view(), name='internal-project'),
     path('internal/projects/<int:pk>/labels/', views.InternalLabelsView.as_view(), name='internal-labels'),
