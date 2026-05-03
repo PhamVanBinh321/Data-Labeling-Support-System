@@ -9,6 +9,19 @@ from .models import User
 class ForgotPasswordSerializer(serializers.Serializer):
     email = serializers.EmailField()
 
+class ResetPasswordSerializer(serializers.Serializer):
+    token = serializers.CharField()
+    new_password = serializers.CharField(write_only=True, min_length=8)
+    confirm_password = serializers.CharField(write_only=True)
+
+    def validate(self, data):
+        if data['new_password'] != data['confirm_password']:
+            raise serializers.ValidationError(
+                {'confirm_password': 'Mật khẩu xác nhận không khớp.'}
+            )
+        validate_password(data['new_password'])
+        return data
+
 class RegisterSerializer(serializers.Serializer):
     name = serializers.CharField(max_length=255)
     email = serializers.EmailField()

@@ -29,11 +29,11 @@ from .serializers import (
     RegisterSerializer, LoginSerializer,
     UserSerializer, UpdateProfileSerializer,
     ChangePasswordSerializer, SetRoleSerializer,
-    ForgotPasswordSerializer,
+    ForgotPasswordSerializer, ResetPasswordSerializer,
 )
 from .utils import success_response, error_response
 from .rabbitmq import publish_event
-from django.core.signing import TimestampSigner
+from django.core.signing import TimestampSigner, BadSignature, SignatureExpired
 from django.conf import settings
 
 
@@ -145,6 +145,41 @@ def forgot_password(request):
         pass
 
     return success_response(message='Nếu email tồn tại trong hệ thống, bạn sẽ nhận được một liên kết đặt lại mật khẩu.')
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def reset_password(request):
+    """
+    POST /api/auth/reset-password/
+    Body: { token, new_password, confirm_password }
+    """
+    serializer = ResetPasswordSerializer(data=request.data)
+    if not serializer.is_valid():
+        return error_response(
+            message='Dữ liệu không hợp lệ.',
+            errors=serializer.errors,
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    
+    token = serializer.validated_data['token']
+    new_password = serializer.validated_data['new_password']
+    
+    signer = TimestampSigner()
+    try:
+        # Token sống tối đa 15 phút (900s)
+        user_id = signer.unsign(token, max_age=900)
+        user = User.objects.get(id=user_id, is_active=True)
+    except SignatureExpired:
+        return error_response(message='Liên kết đã hết hạn. Vui lòng yêu cầu lại.', status=status.HTTP_400_BAD_REQUEST)
+    except (BadSignature, User.DoesNotExist):
+        return error_response(message='Liên kết không hợp lệ.', status=status.HTTP_400_BAD_REQUEST)
+    
+    user.set_password(new_password)
+    user.save(update_fields=['password', 'updated_at'])
+    _invalidate_user(user.id)
+    
+    return success_response(message='Mật khẩu đã được đặt lại thành công. Bạn có thể đăng nhập bằng mật khẩu mới.')
 
 
 @api_view(['POST'])
