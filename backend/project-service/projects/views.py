@@ -597,6 +597,7 @@ class InternalDatasetView(APIView):
 
 class ProjectSnapshotListCreateView(APIView):
     """
+    GET  /api/projects/{id}/snapshots/  — liệt kê các bản sao lưu
     POST /api/projects/{id}/snapshots/  — trigger tạo snapshot
     """
 
@@ -605,6 +606,25 @@ class ProjectSnapshotListCreateView(APIView):
             return Project.objects.get(pk=pk)
         except Project.DoesNotExist:
             return None
+
+    def get(self, request, pk):
+        project = self._get_project(pk)
+        if project is None:
+            return error_response(message='Project không tồn tại.', status=status.HTTP_404_NOT_FOUND)
+        if project.manager_id != request.user.id:
+            return error_response(message='Bạn không phải Manager của project này.', status=status.HTTP_403_FORBIDDEN)
+            
+        snapshots = ProjectSnapshot.objects.filter(project=project)
+        
+        # Lọc theo khoảng thời gian
+        start_date = request.query_params.get('start_date')
+        end_date = request.query_params.get('end_date')
+        if start_date:
+            snapshots = snapshots.filter(created_at__gte=start_date)
+        if end_date:
+            snapshots = snapshots.filter(created_at__lte=end_date)
+            
+        return success_response(data=ProjectSnapshotSerializer(snapshots, many=True).data)
 
     def post(self, request, pk):
         project = self._get_project(pk)
