@@ -14,9 +14,8 @@ from .serializers import (
 )
 from .permissions import IsManager, IsAnnotator, IsReviewer, IsAnyRole, IsInternalService
 from .utils import success_response, error_response
-from .utils import success_response, error_response
 from .publisher import publish_notification
-from .services.distribution import round_robin_assign
+from .services.distribution import round_robin_assign, TaskDistributionError
 
 
 # ─── SERVICE HELPERS ─────────────────────────────────────────────────────────
@@ -191,14 +190,22 @@ class AutoAssignTaskView(APIView):
     def post(self, request):
         project_id = request.data.get('project_id')
         annotator_ids = request.data.get('annotator_ids', [])
-        task_limit = request.data.get('task_limit', 10)
         
-        result = round_robin_assign(project_id, annotator_ids, int(task_limit))
-        
-        return success_response(
-            data=result,
-            message=f'Đã chia thành công {result["assigned_count"]} task.'
-        )
+        try:
+            task_limit = int(request.data.get('task_limit', 10))
+        except ValueError:
+            return error_response('task_limit phải là số nguyên.', status=400)
+            
+        try:
+            result = round_robin_assign(project_id, annotator_ids, task_limit)
+            return success_response(
+                data=result,
+                message=f'Đã chia thành công {result["assigned_count"]} task.'
+            )
+        except TaskDistributionError as e:
+            return error_response(str(e), status=400)
+        except Exception:
+            return error_response('Lỗi hệ thống khi phân chia task.', status=500)
 
 
 # ─── STATE MACHINE + HISTORY ──────────────────────────────────────────────────

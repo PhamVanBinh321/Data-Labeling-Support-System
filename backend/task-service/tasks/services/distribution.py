@@ -2,12 +2,21 @@ from django.db import transaction
 from django.utils import timezone
 from tasks.models import Task
 
+class TaskDistributionError(Exception):
+    pass
+
 def round_robin_assign(project_id: int, annotator_ids: list, task_limit: int = 10) -> dict:
     """
     Chia đều các task PENDING cho danh sách annotator theo thuật toán chia bài (round-robin).
     """
-    if not annotator_ids:
-        return {"assigned_count": 0, "details": {}}
+    if not project_id:
+        raise TaskDistributionError("Thiếu project_id.")
+        
+    if not annotator_ids or not isinstance(annotator_ids, list):
+        raise TaskDistributionError("Danh sách annotator_ids không hợp lệ hoặc rỗng.")
+        
+    if task_limit <= 0:
+        raise TaskDistributionError("task_limit phải lớn hơn 0.")
 
     num_annotators = len(annotator_ids)
     
@@ -17,6 +26,9 @@ def round_robin_assign(project_id: int, annotator_ids: list, task_limit: int = 1
             project_id=project_id,
             status=Task.Status.PENDING
         ).order_by('created_at')[:task_limit]
+
+        if not pending_tasks:
+            raise TaskDistributionError("Không còn task rảnh (PENDING) nào trong dự án này.")
 
         tasks_to_update = []
         assigned_details = {annotator_id: 0 for annotator_id in annotator_ids}
