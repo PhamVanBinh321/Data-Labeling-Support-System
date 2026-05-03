@@ -6,6 +6,9 @@ from .models import User
 
 # ─── Auth serializers ─────────────────────────────────────────────────────────
 
+class ForgotPasswordSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
 class RegisterSerializer(serializers.Serializer):
     name = serializers.CharField(max_length=255)
     email = serializers.EmailField()

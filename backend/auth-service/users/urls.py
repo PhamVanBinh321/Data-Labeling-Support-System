@@ -7,6 +7,7 @@ urlpatterns = [
     path('login/', views.login),
     path('logout/', views.logout),
     path('refresh/', views.refresh_token),
+    path('forgot-password/', views.forgot_password),
 
     # Profile
     path('me/', views.me),                              # GET lấy thông tin

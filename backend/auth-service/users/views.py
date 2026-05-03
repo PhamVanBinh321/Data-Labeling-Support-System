@@ -29,8 +29,12 @@ from .serializers import (
     RegisterSerializer, LoginSerializer,
     UserSerializer, UpdateProfileSerializer,
     ChangePasswordSerializer, SetRoleSerializer,
+    ForgotPasswordSerializer,
 )
 from .utils import success_response, error_response
+from .rabbitmq import publish_event
+from django.core.signing import TimestampSigner
+from django.conf import settings
 
 
 def _make_token_data(user):
@@ -97,6 +101,50 @@ def login(request):
         data=_make_token_data(user),
         message='Đăng nhập thành công.',
     )
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def forgot_password(request):
+    """
+    POST /api/auth/forgot-password/
+    Body: { email }
+    """
+    serializer = ForgotPasswordSerializer(data=request.data)
+    if not serializer.is_valid():
+        return error_response(
+            message='Dữ liệu không hợp lệ.',
+            errors=serializer.errors,
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    
+    email = serializer.validated_data['email'].lower()
+    try:
+        user = User.objects.get(email=email, is_active=True)
+        # Tạo token sống trong 15 phút
+        signer = TimestampSigner()
+        token = signer.sign(str(user.id))
+        
+        frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:5173')
+        reset_link = f"{frontend_url}/reset-password?token={token}"
+        
+        event_data = {
+            'email': user.email,
+            'name': user.get_full_name() or user.email.split('@')[0],
+            'reset_link': reset_link
+        }
+        
+        publish_event(
+            exchange='auth_events',
+            routing_key='user.forgot_password',
+            event_type='forgot_password_requested',
+            data=event_data
+        )
+    except User.DoesNotExist:
+        # Ngăn chặn dò quét email bằng cách luôn báo thành công
+        pass
+
+    return success_response(message='Nếu email tồn tại trong hệ thống, bạn sẽ nhận được một liên kết đặt lại mật khẩu.')
 
 
 @api_view(['POST'])
