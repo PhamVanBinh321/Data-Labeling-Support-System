@@ -12,7 +12,8 @@ import {
   ShieldCheck,
   LayoutDashboard,
   UserCog,
-  ClipboardList
+  ClipboardList,
+  SlidersHorizontal
 } from 'lucide-react';
 
 const Sidebar: React.FC = () => {
@@ -81,6 +82,10 @@ const Sidebar: React.FC = () => {
             <NavLink to="/admin/activity" className={({isActive}) => `nav-item ${isActive ? 'active' : ''}`}>
               <ClipboardList size={20} />
               <span>Nhật ký</span>
+            </NavLink>
+            <NavLink to="/admin/config" className={({isActive}) => `nav-item ${isActive ? 'active' : ''}`}>
+              <SlidersHorizontal size={20} />
+              <span>Cấu hình</span>
             </NavLink>
           </>
         );

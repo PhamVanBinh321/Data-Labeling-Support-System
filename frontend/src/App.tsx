@@ -19,6 +19,7 @@ import QualityMetrics from './pages/reviewer/QualityMetrics';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminUsers from './pages/admin/AdminUsers';
 import AdminActivityLog from './pages/admin/AdminActivityLog';
+import AdminConfig from './pages/admin/AdminConfig';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { DataProvider } from './context/DataContext';
 import { Navigate } from 'react-router-dom';
@@ -85,6 +86,7 @@ function App() {
               <Route path="/admin" element={<AdminDashboard />} />
               <Route path="/admin/users" element={<AdminUsers />} />
               <Route path="/admin/activity" element={<AdminActivityLog />} />
+              <Route path="/admin/config" element={<AdminConfig />} />
               <Route path="/admin/*" element={<AdminDashboard />} />
             </Route>
 
