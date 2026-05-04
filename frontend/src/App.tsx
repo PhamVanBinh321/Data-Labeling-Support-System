@@ -18,6 +18,7 @@ import ReviewerQueue from './pages/reviewer/ReviewerQueue';
 import QualityMetrics from './pages/reviewer/QualityMetrics';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminUsers from './pages/admin/AdminUsers';
+import AdminActivityLog from './pages/admin/AdminActivityLog';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { DataProvider } from './context/DataContext';
 import { Navigate } from 'react-router-dom';
@@ -83,6 +84,7 @@ function App() {
               <Route path="/reviewer/*" element={<ReviewerQueue />} />
               <Route path="/admin" element={<AdminDashboard />} />
               <Route path="/admin/users" element={<AdminUsers />} />
+              <Route path="/admin/activity" element={<AdminActivityLog />} />
               <Route path="/admin/*" element={<AdminDashboard />} />
             </Route>
 

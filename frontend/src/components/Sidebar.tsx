@@ -11,7 +11,8 @@ import {
   ListTodo,
   ShieldCheck,
   LayoutDashboard,
-  UserCog
+  UserCog,
+  ClipboardList
 } from 'lucide-react';
 
 const Sidebar: React.FC = () => {
@@ -76,6 +77,10 @@ const Sidebar: React.FC = () => {
             <NavLink to="/admin/users" className={({isActive}) => `nav-item ${isActive ? 'active' : ''}`}>
               <UserCog size={20} />
               <span>Người dùng</span>
+            </NavLink>
+            <NavLink to="/admin/activity" className={({isActive}) => `nav-item ${isActive ? 'active' : ''}`}>
+              <ClipboardList size={20} />
+              <span>Nhật ký</span>
             </NavLink>
           </>
         );
