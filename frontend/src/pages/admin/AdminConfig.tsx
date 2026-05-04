@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   Settings, Save, RotateCcw, Bell, Shield, Database,
-  Clock, Users, Globe, ChevronRight, CheckCircle, AlertTriangle
+  Clock, Globe, ChevronRight, CheckCircle, AlertTriangle
 } from 'lucide-react';
 import './AdminConfig.css';
 
