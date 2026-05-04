@@ -387,3 +387,220 @@ def get_user(request, user_id):
         data = UserSerializer(user).data
         cache.set(_user_cache_key(user_id), data, timeout=USER_CACHE_TTL)
     return success_response(data=data, message='')
+
+
+# ─── Admin — Quản lý người dùng ───────────────────────────────────────────────
+
+from .permissions import IsAdmin
+from .serializers import AdminUserSerializer, AdminUpdateUserSerializer
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated, IsAdmin])
+def admin_list_users(request):
+    """
+    GET /api/auth/admin/users/
+    Params:
+      - search   : tìm theo tên / email
+      - role     : manager | annotator | reviewer
+      - status   : active | inactive | suspended
+      - page     : số trang (mặc định 1)
+      - page_size: số mục mỗi trang (mặc định 20, tối đa 100)
+    Chỉ admin (is_staff=True) mới gọi được.
+    """
+    queryset = User.objects.all().order_by('-created_at')
+
+    # Tìm kiếm
+    search = request.query_params.get('search', '').strip()
+    if search:
+        queryset = queryset.filter(
+            db_models.Q(first_name__icontains=search)
+            | db_models.Q(last_name__icontains=search)
+            | db_models.Q(email__icontains=search)
+        )
+
+    # Filter theo role
+    role = request.query_params.get('role')
+    if role:
+        queryset = queryset.filter(role=role)
+
+    # Filter theo status (map sang is_active + last_login)
+    from django.utils import timezone
+    from datetime import timedelta
+    status_filter = request.query_params.get('status')
+    if status_filter == 'suspended':
+        queryset = queryset.filter(is_active=False)
+    elif status_filter == 'active':
+        threshold = timezone.now() - timedelta(days=30)
+        queryset = queryset.filter(is_active=True, last_login__gte=threshold)
+    elif status_filter == 'inactive':
+        threshold = timezone.now() - timedelta(days=30)
+        queryset = queryset.filter(
+            is_active=True
+        ).filter(
+            db_models.Q(last_login__isnull=True) | db_models.Q(last_login__lt=threshold)
+        )
+
+    # Phân trang
+    try:
+        page = max(1, int(request.query_params.get('page', 1)))
+        page_size = min(100, max(1, int(request.query_params.get('page_size', 20))))
+    except ValueError:
+        page, page_size = 1, 20
+
+    total = queryset.count()
+    start = (page - 1) * page_size
+    users = queryset[start:start + page_size]
+
+    return success_response(
+        data={
+            'results': AdminUserSerializer(users, many=True).data,
+            'total': total,
+            'page': page,
+            'page_size': page_size,
+            'total_pages': max(1, -(-total // page_size)),  # ceiling division
+        },
+        message='',
+    )
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated, IsAdmin])
+def admin_get_user(request, user_id):
+    """
+    GET /api/auth/admin/users/<user_id>/
+    Xem chi tiết bất kỳ user nào (kể cả suspended).
+    """
+    try:
+        user = User.objects.get(id=user_id)
+    except User.DoesNotExist:
+        return error_response(
+            message=f'Không tìm thấy người dùng với id={user_id}.',
+            status=status.HTTP_404_NOT_FOUND,
+        )
+    return success_response(data=AdminUserSerializer(user).data, message='')
+
+
+@api_view(['PATCH'])
+@permission_classes([IsAuthenticated, IsAdmin])
+def admin_update_user(request, user_id):
+    """
+    PATCH /api/auth/admin/users/<user_id>/
+    Body: { role?, status? }
+      - role   : 'manager' | 'annotator' | 'reviewer'
+      - status : 'active' | 'suspended'
+    Không cho phép sửa tài khoản admin khác hoặc chính mình.
+    """
+    try:
+        user = User.objects.get(id=user_id)
+    except User.DoesNotExist:
+        return error_response(
+            message=f'Không tìm thấy người dùng với id={user_id}.',
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    if user.id == request.user.id:
+        return error_response(
+            message='Không thể tự chỉnh sửa tài khoản của mình qua endpoint này.',
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    serializer = AdminUpdateUserSerializer(data=request.data)
+    if not serializer.is_valid():
+        return error_response(
+            message='Dữ liệu không hợp lệ.',
+            errors=serializer.errors,
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    data = serializer.validated_data
+    update_fields = ['updated_at']
+
+    if 'role' in data:
+        user.role = data['role']
+        user.role_confirmed = True
+        update_fields += ['role', 'role_confirmed']
+
+    if 'status' in data:
+        user.is_active = (data['status'] == 'active')
+        update_fields.append('is_active')
+
+    user.save(update_fields=update_fields)
+    _invalidate_user(user.id)
+
+    return success_response(
+        data=AdminUserSerializer(user).data,
+        message='Cập nhật người dùng thành công.',
+    )
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated, IsAdmin])
+def admin_delete_user(request, user_id):
+    """
+    DELETE /api/auth/admin/users/<user_id>/
+    Soft delete — đặt is_active=False thay vì xoá khỏi DB.
+    Không cho phép xoá chính mình hoặc admin khác.
+    """
+    try:
+        user = User.objects.get(id=user_id)
+    except User.DoesNotExist:
+        return error_response(
+            message=f'Không tìm thấy người dùng với id={user_id}.',
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    if user.id == request.user.id:
+        return error_response(
+            message='Không thể xoá tài khoản của chính mình.',
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    if user.is_staff:
+        return error_response(
+            message='Không thể xoá tài khoản admin.',
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
+    # Soft delete
+    user.is_active = False
+    user.save(update_fields=['is_active', 'updated_at'])
+    _invalidate_user(user.id)
+
+    return success_response(
+        message=f'Đã xoá người dùng "{user.get_full_name() or user.email}".',
+    )
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated, IsAdmin])
+def admin_user_stats(request):
+    """
+    GET /api/auth/admin/users/stats/
+    Trả về thống kê nhanh: tổng user, theo role, theo status.
+    """
+    from django.utils import timezone
+    from datetime import timedelta
+
+    total = User.objects.count()
+    active_threshold = timezone.now() - timedelta(days=30)
+
+    stats = {
+        'total': total,
+        'by_role': {
+            'manager':   User.objects.filter(role='manager',   is_active=True).count(),
+            'annotator': User.objects.filter(role='annotator', is_active=True).count(),
+            'reviewer':  User.objects.filter(role='reviewer',  is_active=True).count(),
+        },
+        'by_status': {
+            'active':    User.objects.filter(is_active=True, last_login__gte=active_threshold).count(),
+            'inactive':  User.objects.filter(
+                is_active=True
+            ).filter(
+                db_models.Q(last_login__isnull=True) | db_models.Q(last_login__lt=active_threshold)
+            ).count(),
+            'suspended': User.objects.filter(is_active=False).count(),
+        },
+    }
+    return success_response(data=stats, message='')
+

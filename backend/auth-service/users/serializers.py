@@ -132,3 +132,60 @@ class SetRoleSerializer(serializers.Serializer):
         if user.role_confirmed:
             raise serializers.ValidationError('Role đã được xác nhận, không thể thay đổi.')
         return data
+
+
+# ─── Admin serializers ────────────────────────────────────────────────────────
+
+class AdminUserSerializer(serializers.ModelSerializer):
+    """Serializer đầy đủ dành cho admin — bao gồm trạng thái và thống kê."""
+    name = serializers.SerializerMethodField()
+    status = serializers.SerializerMethodField()
+    last_login_at = serializers.DateTimeField(source='last_login', read_only=True)
+
+    class Meta:
+        model = User
+        fields = (
+            'id', 'name', 'email', 'role', 'role_confirmed',
+            'status', 'is_active', 'is_staff',
+            'avatar', 'quality_score', 'tasks_completed',
+            'created_at', 'last_login_at',
+        )
+        read_only_fields = fields
+
+    def get_name(self, obj):
+        return obj.get_full_name() or obj.email.split('@')[0]
+
+    def get_status(self, obj):
+        """
+        Quy ước trạng thái:
+          - is_active=False           → 'suspended'
+          - is_active=True, có login  → 'active'
+          - is_active=True, chưa login hoặc lâu rồi → 'inactive'
+        """
+        if not obj.is_active:
+            return 'suspended'
+        if obj.last_login is None:
+            return 'inactive'
+        from django.utils import timezone
+        from datetime import timedelta
+        if (timezone.now() - obj.last_login) > timedelta(days=30):
+            return 'inactive'
+        return 'active'
+
+
+class AdminUpdateUserSerializer(serializers.Serializer):
+    """Dùng để admin cập nhật role hoặc trạng thái tài khoản."""
+    role = serializers.ChoiceField(
+        choices=[('manager', 'Manager'), ('annotator', 'Annotator'), ('reviewer', 'Reviewer')],
+        required=False,
+    )
+    status = serializers.ChoiceField(
+        choices=[('active', 'Hoạt động'), ('suspended', 'Khoá')],
+        required=False,
+    )
+
+    def validate(self, data):
+        if not data:
+            raise serializers.ValidationError('Cần cung cấp ít nhất một trường để cập nhật.')
+        return data
+

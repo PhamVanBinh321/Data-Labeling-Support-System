@@ -1,6 +1,18 @@
 from rest_framework.permissions import BasePermission
 
 
+class IsAdmin(BasePermission):
+    """Chỉ Admin (is_staff) mới được gọi endpoint này."""
+    message = 'Chỉ Admin mới có quyền thực hiện hành động này.'
+
+    def has_permission(self, request, view):
+        return bool(
+            request.user
+            and request.user.is_authenticated
+            and request.user.is_staff
+        )
+
+
 class IsManager(BasePermission):
     """Chỉ Manager mới được gọi endpoint này."""
     message = 'Chỉ Manager mới có quyền thực hiện hành động này.'
