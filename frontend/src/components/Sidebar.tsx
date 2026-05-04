@@ -10,7 +10,8 @@ import {
   BarChart,
   ListTodo,
   ShieldCheck,
-  LayoutDashboard
+  LayoutDashboard,
+  UserCog
 } from 'lucide-react';
 
 const Sidebar: React.FC = () => {
@@ -67,10 +68,16 @@ const Sidebar: React.FC = () => {
         );
       case 'admin':
         return (
-          <NavLink to="/admin" className={({isActive}) => `nav-item ${isActive ? 'active' : ''}`}>
-            <LayoutDashboard size={20} />
-            <span>Dashboard</span>
-          </NavLink>
+          <>
+            <NavLink to="/admin" end className={({isActive}) => `nav-item ${isActive ? 'active' : ''}`}>
+              <LayoutDashboard size={20} />
+              <span>Dashboard</span>
+            </NavLink>
+            <NavLink to="/admin/users" className={({isActive}) => `nav-item ${isActive ? 'active' : ''}`}>
+              <UserCog size={20} />
+              <span>Người dùng</span>
+            </NavLink>
+          </>
         );
       default:
         return null;
